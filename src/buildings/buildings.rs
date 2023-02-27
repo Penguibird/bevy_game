@@ -1,4 +1,10 @@
-use bevy::{input::keyboard::KeyboardInput, prelude::*};
+use bevy::{
+    input::{keyboard::KeyboardInput, ButtonState},
+    prelude::*,
+};
+use bevy_rapier3d::prelude::RigidBody;
+
+use crate::velocity::collisions::CollisionComponent;
 
 #[derive(Component)]
 struct Speeder;
@@ -22,7 +28,7 @@ pub fn speeder_spawning(
 ) {
     for ev in keybd_events.iter() {
         if let Some(key) = ev.key_code {
-            if key == KeyCode::Space {
+            if key == KeyCode::Space && ev.state == ButtonState::Released {
                 let my_gltf = ass.load("spacekit_2/Models/GLTF format/craft_speederA.glb#Scene0");
                 // if let Some(cam_pos) = query.single_mut() {
 
@@ -32,6 +38,8 @@ pub fn speeder_spawning(
                 commands.spawn((
                     Speeder,
                     AlienTarget::default(),
+                    // CollisionComponent::default(),
+                    RigidBody::Fixed,
                     SceneBundle {
                         scene: my_gltf,
                         transform: Transform::from_xyz(cam_pos.x, 0.1, cam_pos.z),
@@ -41,4 +49,5 @@ pub fn speeder_spawning(
             }
         }
     }
+    keybd_events.clear()
 }

@@ -2,13 +2,17 @@ use std::f32::consts::PI;
 
 use aliens::alien::AlienPlugin;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 use buildings::buildings::speeder_spawning;
-use cameras::top_down_camera::{spawn_camera, move_camera};
-use velocity::velocity::update_positions;
+use cameras::top_down_camera::{move_camera, spawn_camera};
+use velocity::{
+    collisions::{check_for_collisions, CollisionEvent},
+    velocity::update_positions,
+};
 mod cameras;
 
-mod buildings;
 mod aliens;
+mod buildings;
 mod velocity;
 
 fn main() {
@@ -22,9 +26,13 @@ fn main() {
         // .add_system(pan_orbit_camera)
         // *Camera you can only move
         .add_startup_system(spawn_camera)
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_system(move_camera)
         .add_system(speeder_spawning)
-        .add_system(update_positions)
+        // .add_system(update_positions)
+        // .add_system(check_for_collisions.before(update_positions))
+        .add_event::<CollisionEvent>()
         .add_startup_system(setup)
         .run();
 }

@@ -1,10 +1,18 @@
 use std::{cmp::Ordering, time::Duration};
 
 use bevy::{prelude::*, reflect::erased_serde::__private::serde::__private::de};
+use bevy_rapier3d::prelude::RigidBody;
 use rand::Rng;
 
-use crate::{buildings::buildings::AlienTarget, velocity::velocity::Velocity};
+use crate::{
+    buildings::buildings::AlienTarget,
+    velocity::{
+        collisions::{ColliderType, CollisionComponent},
+        velocity::Velocity,
+    },
+};
 
+const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(200);
 #[derive(Resource)]
 pub struct AlienSpawnTimer {
     timer: Timer,
@@ -14,7 +22,7 @@ pub struct AlienPlugin;
 impl Plugin for AlienPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(AlienSpawnTimer {
-            timer: Timer::new(Duration::from_secs(5), TimerMode::Repeating),
+            timer: Timer::new(ALIEN_SPAWN_TIMER, TimerMode::Repeating),
         })
         .add_system(alien_ai)
         .add_system(spawn_aliens);
@@ -24,11 +32,27 @@ impl Plugin for AlienPlugin {
 #[derive(Component, Default)]
 pub struct Alien;
 
-#[derive(Bundle, Default)]
+#[derive(Bundle)]
 pub struct AlienBundle {
     alien: Alien,
     scene: SceneBundle,
     velocity: Velocity,
+    collision: CollisionComponent,
+    rigid_body: RigidBody,
+}
+
+impl Default for AlienBundle {
+    fn default() -> Self {
+        AlienBundle {
+            collision: CollisionComponent {
+                collider_type: ColliderType::Alien,
+            },
+            alien: Alien::default(),
+            scene: SceneBundle::default(),
+            velocity: Velocity::default(),
+            rigid_body: RigidBody::Dynamic,
+        }
+    }
 }
 
 pub fn spawn_aliens(

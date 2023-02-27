@@ -99,7 +99,11 @@ pub fn pan_orbit_camera(
 }
 
 fn _get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
-    let window = windows.get_primary().unwrap();
+    let window = windows.get_primary();
+    if let None = window {
+        return Vec2::ZERO;
+    }
+    let window = window.unwrap();
     let window = Vec2::new(window.width() as f32, window.height() as f32);
     window
 }
