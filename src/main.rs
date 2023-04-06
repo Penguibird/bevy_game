@@ -1,39 +1,45 @@
 use std::f32::consts::PI;
 
 use aliens::alien::AlienPlugin;
+use bevy::pbr::DirectionalLightShadowMap;
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
-use buildings::buildings::speeder_spawning;
-use cameras::top_down_camera::{move_camera, spawn_camera};
-use velocity::{
-    collisions::{check_for_collisions, CollisionEvent},
-    velocity::update_positions,
-};
+use bevy_rapier3d::{prelude::*, rapier::prelude::ColliderBuilder};
+
+use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity};
+use buildings::buildings::{damage_dealing, speeder_death, speeder_spawning, speeder_targetting};
+use cameras::orbit_camera::{pan_orbit_camera, spawn_camera, camera_testing};
+use health::health::{death_timers, DeathEvent};
 mod cameras;
 
 mod aliens;
 mod buildings;
-mod velocity;
+mod health;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(AlienPlugin)
         .insert_resource(Msaa { samples: 4 })
-        // .insert_resource(DirectionalLightShadowMap { size: 50 })
-        // // * Camera you can rotate
-        // .add_startup_system(spawn_camera)
-        // .add_system(pan_orbit_camera)
-        // *Camera you can only move
+        .insert_resource(DirectionalLightShadowMap { size: 50 })
+        // * Camera you can rotate
         .add_startup_system(spawn_camera)
+        .add_system(pan_orbit_camera)
+        .add_system(camera_testing)
+        // *Camera you can only move
+        // .add_startup_system(spawn_camera)
+        // .add_system(move_camera)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
-        .add_system(move_camera)
         .add_system(speeder_spawning)
         // .add_system(update_positions)
         // .add_system(check_for_collisions.before(update_positions))
         .add_event::<CollisionEvent>()
+        .add_event::<DeathEvent>()
         .add_startup_system(setup)
+        .add_system(damage_dealing)
+        .add_system(speeder_targetting)
+        .add_system(death_timers)
+        .add_system(speeder_death)
         .run();
 }
 
@@ -44,11 +50,18 @@ fn setup(
     ass: Res<AssetServer>,
 ) {
     // plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
+    commands
+        .spawn((PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
+            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+            ..default()
+        },))
+        .with_children(|c| {
+            c.spawn((
+                Transform::from_xyz(0.0, -0.02, 0.0),
+                Collider::cuboid(50.0, 0.01, 50.0),
+            ));
+        });
     // cube
     // commands.spawn(PbrBundle {
     //     mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
