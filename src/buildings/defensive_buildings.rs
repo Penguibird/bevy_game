@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
     prelude::*,
@@ -8,13 +6,14 @@ use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, RigidBody};
 
 use crate::{
     aliens::alien::Alien,
+    effects::muzzleflash::{GunFireEvent, GunType},
     health::health::{DeathEvent, Health},
 };
 
 #[derive(Component)]
 pub struct Speeder;
 
-#[derive(Component)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct AlienTarget {
     pub priority: i8,
 }
@@ -25,68 +24,28 @@ impl Default for AlienTarget {
     }
 }
 
-pub fn speeder_spawning(
-    mut keybd_events: EventReader<KeyboardInput>,
-    mut commands: Commands,
-    query: Query<&mut Transform, With<Camera>>,
-    ass: Res<AssetServer>,
-) {
-    for ev in keybd_events.iter() {
-        if let Some(key) = ev.key_code {
-            if key == KeyCode::Space && ev.state == ButtonState::Released {
-                let my_gltf = ass.load("spacekit_2/Models/GLTF format/craft_speederA.glb#Scene0");
-                // if let Some(cam_pos) = query.single_mut() {
-
-                // }
-                let cam_pos = query.single().translation;
-                println!("Spawning a turret");
-                commands
-                    .spawn((
-                        Speeder,
-                        TargetSelecting {
-                            target: None,
-                            range: 10.0,
-                        },
-                        DamageDealing {
-                            cooldown: Timer::new(Duration::from_millis(100), TimerMode::Repeating),
-                            damage: 10,
-                        },
-                        Health::new(100),
-                        AlienTarget::default(),
-                        // CollisionComponent::default(),
-                        RigidBody::Fixed,
-                        CollisionGroups::new(Group::GROUP_1, Group::ALL),
-                        Collider::cylinder(1.0, 1.0),
-                        SpatialBundle {
-                            transform: Transform::from_xyz(cam_pos.x, 0.0, cam_pos.z),
-                            ..default()
-                        },
-                    ))
-                    .with_children(|c| {
-                        c.spawn((SceneBundle {
-                            scene: my_gltf,
-                            transform: Transform::from_xyz(-2.0, 0.0, -1.5),
-                            ..Default::default()
-                        },));
-                    });
-            }
-        }
-    }
-    keybd_events.clear()
-}
-
 fn distance(a: &Vec3, b: &Vec3) -> f32 {
     f32::sqrt(f32::powi((a.x - b.x), 2) + f32::powi((a.z - b.z), 2))
 }
-#[derive(Component)]
+#[derive(Component, Clone, Copy, Debug)]
 pub struct TargetSelecting {
     pub target: Option<Entity>,
     pub range: f32,
 }
-pub fn speeder_targetting(
+impl TargetSelecting {
+    pub fn new(range: f32) -> Self {
+        Self {
+            target: None,
+            range,
+        }
+    }
+}
+
+pub fn defensive_buildings_targetting(
     time: Res<Time>,
     mut speeders: Query<(&mut Transform, &mut TargetSelecting), Without<Alien>>,
     aliens: Query<(&Health, &Alien, &Transform, Entity)>,
+    // muzzleflash_template: Res<MuzzleflashTemplate>,
 ) {
     for (mut speeder_transform, mut speeder_target) in speeders.iter_mut() {
         if let None = speeder_target.target {
@@ -110,36 +69,63 @@ pub fn speeder_targetting(
 
                 let angle = diff.dot(speeder_transform.rotation.mul_vec3(Vec3::X));
                 let t = speeder_transform.translation;
-                speeder_transform.rotate_around(t, Quat::from_axis_angle(Vec3::Y, angle));
+                speeder_transform.rotate_around(t, Quat::from_axis_angle(Vec3::Y, -angle));
+                let mut transform = speeder_transform.clone();
+                transform.translation += Vec3::Y * 2.;
             }
         }
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Clone)]
 pub struct DamageDealing {
     pub damage: i32,
     pub cooldown: Timer,
 }
 
+impl DamageDealing {
+    pub fn new(damage: i32, milis: u32) -> Self {
+        DamageDealing {
+            damage,
+            cooldown: Timer::from_seconds(milis as f32 / 1000., TimerMode::Repeating),
+        }
+    }
+}
+
 pub fn damage_dealing(
     time: Res<Time>,
     mut querySet: ParamSet<(
-        Query<(&mut DamageDealing, &mut TargetSelecting, Entity)>,
+        Query<(
+            &mut DamageDealing,
+            &mut TargetSelecting,
+            Entity,
+            &Transform,
+            Option<&GunType>,
+        )>,
         Query<(&mut Health, Entity)>,
     )>,
     mut ev: EventWriter<DeathEvent>,
+    mut gun_fire_event: EventWriter<GunFireEvent>,
 ) {
     let mut speeders = querySet.p0();
     // let aliens = querySet.p1();
     let mut targets: Vec<(Entity, i32, Entity)> = Vec::new();
-    for (mut d, mut t, e) in speeders.iter_mut() {
+    for (mut d, mut t, e, transform, gun_type) in speeders.iter_mut() {
         d.cooldown.tick(time.delta());
         if !d.cooldown.just_finished() {
             continue;
         }
         if let Some(t) = t.target {
             targets.push((t, d.damage, e));
+
+            let gun_transform = transform.clone();
+
+            if let Some(gun_type) = gun_type {
+                gun_fire_event.send(GunFireEvent {
+                    transform: gun_transform,
+                    gun_type: *gun_type,
+                });
+            };
         }
     }
 
@@ -180,3 +166,48 @@ pub fn speeder_death(
     }
     ev.clear();
 }
+
+// pub fn speeder_spawning(
+//     mut build_event: EventReader<BuildEvent>,
+//     mut commands: Commands,
+//     ass: Res<AssetServer>,
+// ) {
+//     for ev in build_event.iter() {
+//         if let BuildEvent::Speeder(ev) = ev {
+//             let my_gltf = ass.load("spacekit_2/Models/GLTF format/craft_speederA.glb#Scene0");
+//             // if let Some(cam_pos) = query.single_mut() {
+
+//             // }
+//             println!("Spawning a turret");
+//             commands
+//                 .spawn((
+//                     Speeder,
+//                     TargetSelecting {
+//                         target: None,
+//                         range: 10.0,
+//                     },
+//                     DamageDealing {
+//                         cooldown: Timer::new(Duration::from_millis(100), TimerMode::Repeating),
+//                         damage: 10,
+//                     },
+//                     Health::new(100),
+//                     AlienTarget::default(),
+//                     // CollisionComponent::default(),
+//                     Collider::cylinder(1.0, 1.0),
+//                     RigidBody::Fixed,
+//                     CollisionGroups::new(Group::GROUP_1, Group::ALL),
+//                     SpatialBundle {
+//                         transform: Transform::from_xyz(ev.point.x, 0.0, ev.point.z),
+//                         ..default()
+//                     },
+//                 ))
+//                 .with_children(|c| {
+//                     c.spawn((SceneBundle {
+//                         scene: my_gltf,
+//                         transform: Transform::from_xyz(-2.0, 0.0, -1.5),
+//                         ..Default::default()
+//                     },));
+//                 });
+//         }
+//     }
+// }

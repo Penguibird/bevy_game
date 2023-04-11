@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Component)]
+#[derive(Component, Debug, Clone)]
 pub struct Health {
     pub max_hp: i32,
     pub hp: i32,
@@ -34,8 +34,8 @@ pub fn death_timers(
     }
     for e in ev.iter() {
         if let Ok(mut x) = query.get_mut(e.entity) {
-            x.dead_for_timer.unpause();
             x.dead_for_timer.reset();
+            x.dead_for_timer.unpause();
         }
     }
 }

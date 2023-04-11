@@ -5,5 +5,8 @@
     "activityBar.background": "#491A4B",
     "titleBar.activeBackground": "#66246A",
     "titleBar.activeForeground": "#FDF9FD"
-  }
+  },
+  "rust-analyzer.linkedProjects": [
+    ".\\Cargo.toml"
+  ]
 }

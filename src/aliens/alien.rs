@@ -1,15 +1,15 @@
-use std::{cmp::Ordering, time::Duration};
+use std::{cmp::Ordering, f32::consts::PI, time::Duration};
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity};
+use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity, Friction};
 use rand::Rng;
 
 use crate::{
-    buildings::buildings::{AlienTarget, DamageDealing, TargetSelecting},
+    buildings::defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting},
     health::health::{DeathEvent, Health},
 };
-
-const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(20000);
+const ALIEN_SPEED: f32 = 5.;
+const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(1000);
 
 #[derive(Resource)]
 pub struct AlienSpawnTimer {
@@ -86,7 +86,8 @@ pub fn spawn_aliens(
                     transform: Transform::from_xyz(x, 0.0, z), //.with_scale(Vec3::new(2.0,2.0,2.0)),
                     ..default()
                 },
-                Collider::cylinder(1.0, 0.3),
+                Collider::cylinder(0.4, 0.3),
+                Friction::default(),
                 CollisionGroups::new(Group::GROUP_10, Group::GROUP_1),
                 Velocity { ..default() },
                 TargetSelecting {
@@ -101,7 +102,7 @@ pub fn spawn_aliens(
             .with_children(|c| {
                 c.spawn((SceneBundle {
                     scene: gltf,
-                    transform: Transform::from_xyz(-2.0, 0.0, -1.5),
+                    transform: Transform::from_xyz(-2.0, -1.0, -1.5),
                     ..default()
                 },));
             });
@@ -129,7 +130,7 @@ pub fn alien_ai(
         if let Some((t, _, e)) = target {
             // println!("Alien moving towards a target at {:?}", t.translation);
             *alien.1 = Velocity {
-                linvel: t.translation - alien.0.translation,
+                linvel: (t.translation - alien.0.translation).normalize() * ALIEN_SPEED,
                 angvel: Vec3::ZERO,
             };
             alien.3.target = Some(e);
@@ -138,14 +139,17 @@ pub fn alien_ai(
 }
 
 pub fn alien_death(
-    mut aliens: Query<(&mut Transform, &mut Alien)>,
+    mut aliens: Query<(&mut Transform, &mut Alien, &mut Velocity)>,
     mut ev: EventReader<DeathEvent>,
 ) {
     for e in ev.iter() {
-        if let Ok((mut t, mut a)) = aliens.get_mut(e.entity) {
-            let r = t.rotation;
-            t.rotate_axis(r.mul_vec3(Vec3::X), 90.0);
-            a.alive = false;
+        if let Ok((mut t, mut a, mut vel)) = aliens.get_mut(e.entity) {
+            if a.alive {
+                let r = t.rotation;
+                t.rotate_axis(r.mul_vec3(Vec3::X), PI / 2.0);
+                vel.linvel = Vec3::splat(0.);
+                a.alive = false;
+            }
         }
     }
 }
@@ -158,7 +162,7 @@ pub fn alien_cleanup(
     for mut x in query.iter_mut() {
         x.0.dead_for_timer.tick(time.delta());
         if x.0.dead_for_timer.finished() {
-            commands.entity(x.1).despawn();
+            commands.entity(x.1).despawn_recursive();
         }
     }
 }
