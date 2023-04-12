@@ -1,14 +1,34 @@
+use std::time::Duration;
+
 use bevy::{
     input::{keyboard::KeyboardInput, ButtonState},
     prelude::*,
 };
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, RigidBody};
+use bevy_tweening::{Animator, EaseFunction, Tween, TweenCompleted};
 
 use crate::{
     aliens::alien::Alien,
-    effects::muzzleflash::{GunFireEvent, GunType},
+    effects::{
+        muzzleflash::{GunFireEvent, GunType},
+        relative_lenses::RelativeTransformPositionLens,
+    },
     health::health::{DeathEvent, Health},
 };
+
+use super::building_bundles::BuildingInfoComponent;
+
+use super::grid::{Grid, SQUARE_SIZE};
+pub struct DefensiveBuildingPlugin;
+impl Plugin for DefensiveBuildingPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_system(damage_dealing)
+            .add_system(defensive_buildings_targetting)
+            .add_system(defensive_building_death)
+            // .add_event::<DespawnEvent>()
+            .add_system(despawn_event_handling);
+    }
+}
 
 #[derive(Component)]
 pub struct Speeder;
@@ -42,7 +62,6 @@ impl TargetSelecting {
 }
 
 pub fn defensive_buildings_targetting(
-    time: Res<Time>,
     mut speeders: Query<(&mut Transform, &mut TargetSelecting), Without<Alien>>,
     aliens: Query<(&Health, &Alien, &Transform, Entity)>,
     // muzzleflash_template: Res<MuzzleflashTemplate>,
@@ -94,7 +113,7 @@ impl DamageDealing {
 
 pub fn damage_dealing(
     time: Res<Time>,
-    mut querySet: ParamSet<(
+    mut query_set: ParamSet<(
         Query<(
             &mut DamageDealing,
             &mut TargetSelecting,
@@ -102,21 +121,27 @@ pub fn damage_dealing(
             &Transform,
             Option<&GunType>,
         )>,
-        Query<(&mut Health, Entity)>,
+        Query<(&mut Health, &Transform, Entity)>,
     )>,
     mut ev: EventWriter<DeathEvent>,
     mut gun_fire_event: EventWriter<GunFireEvent>,
 ) {
-    let mut speeders = querySet.p0();
+    let mut speeders = query_set.p0();
     // let aliens = querySet.p1();
-    let mut targets: Vec<(Entity, i32, Entity)> = Vec::new();
-    for (mut d, mut t, e, transform, gun_type) in speeders.iter_mut() {
+    let mut targets: Vec<(Entity, i32, Entity, Vec3, f32)> = Vec::new();
+    for (mut d, target_selecting, e, transform, gun_type) in speeders.iter_mut() {
         d.cooldown.tick(time.delta());
         if !d.cooldown.just_finished() {
             continue;
         }
-        if let Some(t) = t.target {
-            targets.push((t, d.damage, e));
+        if let Some(t) = target_selecting.target {
+            targets.push((
+                t,
+                d.damage,
+                e,
+                transform.translation,
+                target_selecting.range,
+            ));
 
             let gun_transform = transform.clone();
 
@@ -129,42 +154,68 @@ pub fn damage_dealing(
         }
     }
 
-    for (target, d, killer) in targets {
+    for (target, d, killer, hitter_translation, hitter_range) in targets {
         let mut killed = false;
-        if let Ok((mut h, e)) = querySet.p1().get_mut(target) {
-            h.hp -= d;
-            if h.hp <= 0 {
-                killed = true;
-                ev.send(DeathEvent {
-                    entity: target,
-                    killer: Some(killer),
-                })
+        if let Ok((mut h, transform, _)) = query_set.p1().get_mut(target) {
+            if transform.translation.distance(hitter_translation).abs() <= hitter_range {
+                h.hp -= d;
+                if h.hp <= 0 {
+                    killed = true;
+                    ev.send(DeathEvent {
+                        entity: target,
+                        killer: Some(killer),
+                    })
+                }
             }
         }
 
         if !killed {
             continue;
         }
-        if let Ok(mut speeder) = querySet.p0().get_mut(killer) {
+        if let Ok(mut speeder) = query_set.p0().get_mut(killer) {
             speeder.1.target = None;
         }
     }
 }
 
-pub fn speeder_death(
-    mut query: Query<(&mut Transform, Entity), With<Speeder>>,
+
+pub fn defensive_building_death(
+    mut query: Query<(&mut Transform, Entity), With<BuildingInfoComponent>>,
     mut ev: EventReader<DeathEvent>,
+    mut grid: ResMut<Grid>,
     mut commands: Commands,
 ) {
     for e in ev.iter() {
-        if let Ok((mut t, speeder)) = query.get_mut(e.entity) {
-            let r = t.rotation;
-            t.rotate_axis(r.mul_vec3(Vec3::X), 180.0);
-            commands.entity(speeder).despawn_recursive();
+        if let Ok((t, e)) = query.get_mut(e.entity) {
+            // t.translation += Vec3::new(0. -5., 0.);
+            let start = Vec3::new(0., 0., 0.);
+            let end = Vec3::new(0., -3., 0.);
+            let point = t.translation.clone();
+            grid.unblock_square_vec3(point);
+            let tween = Tween::new(
+                EaseFunction::BounceIn,
+                Duration::from_millis(1000),
+                RelativeTransformPositionLens {
+                    previous: start,
+                    start,
+                    end,
+                },
+            )
+            .with_completed_event(DESPAWN_EVENT_CODE);
+            commands.entity(e).insert(Animator::new(tween));
             // a.alive = false;
         }
     }
     ev.clear();
+}
+const DESPAWN_EVENT_CODE: u64 = 13;
+
+pub fn despawn_event_handling(mut commands: Commands, mut ev: EventReader<TweenCompleted>) {
+    for ev in ev.iter() {
+        if ev.user_data == DESPAWN_EVENT_CODE {
+            commands.entity(ev.entity).despawn_recursive();
+        }
+    }
 }
 
 // pub fn speeder_spawning(

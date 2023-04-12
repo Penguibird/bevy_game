@@ -8,7 +8,7 @@ use super::utils::get_keybd_vec;
 #[derive(Component)]
 pub struct TopDownCamera;
 
-pub fn spawn_camera(mut commands: Commands) {
+pub fn _spawn_camera(mut commands: Commands) {
     let translation = Vec3::new(0.0, 10.0, 0.0);
     commands.spawn((
         Camera3dBundle {
@@ -20,7 +20,7 @@ pub fn spawn_camera(mut commands: Commands) {
     ));
 }
 
-pub fn move_camera(
+pub fn _move_camera(
     mut cam_query: Query<&mut Transform, With<TopDownCamera>>,
     mut keybd_events: EventReader<KeyboardInput>,
     mut mouse_scroll: EventReader<MouseWheel>,

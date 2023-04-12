@@ -1,15 +1,26 @@
-use std::{cmp::Ordering, f32::consts::PI, time::Duration};
+use std::{cmp::Ordering, f32::consts::PI, time::Duration, };
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity, Friction};
 use rand::Rng;
 
 use crate::{
-    buildings::defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting},
+    buildings::{defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting}, grid::Grid},
     health::health::{DeathEvent, Health},
 };
 const ALIEN_SPEED: f32 = 5.;
 const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(1000);
+
+#[derive(Resource)]
+pub struct AlienCount {
+    pub count: u32,
+}
+
+impl Default for AlienCount {
+    fn default() -> Self {
+        AlienCount { count: 0 }
+    }
+}
 
 #[derive(Resource)]
 pub struct AlienSpawnTimer {
@@ -22,6 +33,7 @@ impl Plugin for AlienPlugin {
         app.insert_resource(AlienSpawnTimer {
             timer: Timer::new(ALIEN_SPAWN_TIMER, TimerMode::Repeating),
         })
+        .init_resource::<AlienCount>()
         .add_system(alien_ai)
         .add_system(spawn_aliens)
         .add_system(alien_cleanup)
@@ -64,6 +76,8 @@ pub fn spawn_aliens(
     time: Res<Time>,
     mut timer: ResMut<AlienSpawnTimer>,
     ass: Res<AssetServer>,
+    mut count: ResMut<AlienCount>,
+    grid: Res<Grid>,
 ) {
     timer.timer.tick(time.delta());
     if timer.timer.finished() {
@@ -72,10 +86,19 @@ pub fn spawn_aliens(
         // let mesh: &Mesh =
         //     Assets::get(Assets, &ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0")).unwrap();
         let mut rng = rand::thread_rng();
-        let x: f32 = rng.gen::<f32>() * 30.0 - 15.0;
-        let z: f32 = rng.gen::<f32>() * 30.0 - 15.0;
+        let angle: f32 = rng.gen::<f32>() * 2. * PI;
+
+        dbg!(&grid);
+        
+        let mut x = grid.base_center.x + grid.center_radius * f32::cos(angle);
+        let mut z = grid.base_center.z + grid.center_radius * f32::sin(angle);
+        
+        x += rng.gen::<f32>() * 1.;
+        z += rng.gen::<f32>() * 1.;
+
 
         println!("Spawning an alien at {}, {}", x, z);
+        count.count += 1;
         commands
             .spawn((
                 Alien::default(),
@@ -139,15 +162,18 @@ pub fn alien_ai(
 }
 
 pub fn alien_death(
-    mut aliens: Query<(&mut Transform, &mut Alien, &mut Velocity)>,
+    mut aliens: Query<(&mut Transform, &mut Alien, &mut Velocity, &mut DamageDealing)>,
     mut ev: EventReader<DeathEvent>,
+    mut count: ResMut<AlienCount>,
 ) {
     for e in ev.iter() {
-        if let Ok((mut t, mut a, mut vel)) = aliens.get_mut(e.entity) {
+        if let Ok((mut t, mut a, mut vel, mut dmg)) = aliens.get_mut(e.entity) {
             if a.alive {
+                count.count -= 1;
                 let r = t.rotation;
                 t.rotate_axis(r.mul_vec3(Vec3::X), PI / 2.0);
                 vel.linvel = Vec3::splat(0.);
+                dmg.damage = 0;
                 a.alive = false;
             }
         }

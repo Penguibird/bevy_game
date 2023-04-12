@@ -37,7 +37,7 @@ use bevy_hanabi::prelude::*;
 //     Ok(())
 // }
 
-pub fn firework(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
+pub fn _firework(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
     // commands.spawn((
     //     Camera3dBundle {
     //         transform: Transform::from_translation(Vec3::new(0., 0., 50.)),

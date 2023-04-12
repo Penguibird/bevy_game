@@ -1,9 +1,43 @@
 use std::f32::consts::PI;
 
-use bevy::prelude::*;
+use bevy::{input::mouse::MouseButtonInput, prelude::*};
 
-use crate::cameras::orbit_camera::calculate_from_zoom_level;
+use crate::cameras::pan_camera::calculate_from_zoom_level;
 
+use super::pan_camera::{get_primary_window_size, PanOrbitCamera};
+
+
+#[derive(Clone, Copy, Debug)]
+pub struct WorldClickEvent {
+    pub point: Vec3,
+    pub mouse_event: MouseButtonInput,
+}
+
+pub fn emit_world_click_events(
+    windows: Res<Windows>,
+    mut query_set: ParamSet<(Query<(&PanOrbitCamera, &Transform, &Projection)>,)>,
+    mut mouse_click: EventReader<MouseButtonInput>,
+    mut ev_writer: EventWriter<WorldClickEvent>,
+) {
+    let cam_query = query_set.p0();
+    let (cam, transform, proj) = cam_query.single();
+
+    let screen_size_half = get_primary_window_size(&windows) / 2.0;
+    let m_pos = windows
+        .get_primary()
+        .unwrap()
+        .cursor_position()
+        .unwrap_or(Vec2 { x: 0.0, y: 0.0 });
+    let point =
+        get_plane_point_from_mouse_pos(m_pos, screen_size_half, proj, cam.zoom_level, transform);
+
+    for ev in mouse_click.iter() {
+        ev_writer.send(WorldClickEvent {
+            point,
+            mouse_event: *ev,
+        })
+    }
+}
 
 pub fn get_plane_point_from_mouse_pos(
     mouse: Vec2,
@@ -26,7 +60,7 @@ pub fn get_plane_point_from_mouse_pos(
 
     let (_, y, tilt) = calculate_from_zoom_level(zoom_level);
     let get_beta_from_px = |px: f32, screen_half: f32, fov_half: f32| {
-        let mut beta = f32::atan((screen_half - px) / (screen_half / fov_half.tan()));
+        let beta = f32::atan((screen_half - px) / (screen_half / fov_half.tan()));
 
         // beta = f32::atan((screen_half-px) / (near));
 

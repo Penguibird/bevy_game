@@ -10,6 +10,7 @@ use bevy::{
     render::primitives::Frustum,
     transform,
 };
+use bevy_mod_picking::PickingCameraBundle;
 use bevy_rapier3d::na::{clamp, Quaternion};
 
 use crate::{
@@ -47,7 +48,7 @@ impl RemoveY for Vec3 {
 
 const CAMERA_PIVOT_HEIHGT: f32 = 30.0;
 
-pub fn camera_testing(
+pub fn _camera_testing(
     mbutton: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     query: Query<(&PanOrbitCamera, &Transform, &Projection)>,
@@ -62,7 +63,7 @@ pub fn camera_testing(
 
         // println!("Mouse {:?}, {:?}", pan_delta, m_pos);
         let screen_size_half = get_primary_window_size(&windows) / 2.0;
-        let mut vec = get_plane_point_from_mouse_pos(
+        let vec = get_plane_point_from_mouse_pos(
             m_pos,
             screen_size_half,
             proj,
@@ -92,30 +93,21 @@ pub fn pan_orbit_camera(
     input_mouse: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
-    mut commands: Commands,
 
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     ui_state: Res<UIState>,
 ) {
     // change input mapping for orbit and panning here
-    let orbit_button = MouseButton::Right;
     let pan_button = MouseButton::Left;
 
     let mut pan_delta = Vec2::ZERO;
     let mut m_pos: Vec2 = Vec2::ZERO;
 
     // let mut rotation_move = Vec2::ZERO;
-    let mut horizontal_orbit: f32 = 0.0;
+    let horizontal_orbit: f32 = 0.0;
     let mut scroll = 0.0;
     let key_vec = get_keybd_vec(&mut ev_keybd);
 
-    if input_mouse.pressed(orbit_button) {
-        for ev in ev_motion.iter() {
-            // rotation_move += ev.delta;
-            // horizontal_orbit += ev.delta.x;
-        }
-    } else if input_mouse.pressed(pan_button) {
+    if input_mouse.pressed(pan_button) {
         // Pan only if we're not rotating at the moment
         // Pan only if UIMode panning
         if ui_state.mode == UIMode::Panning {
@@ -129,8 +121,8 @@ pub fn pan_orbit_camera(
             }
         }
     }
-    mouse_pos.clear();
-    ev_motion.clear();
+    // mouse_pos.clear();
+    // ev_motion.clear();
 
     // m_pos = windows.get_primary().unwrap().cursor_position().unwrap();
     for ev in ev_scroll.iter() {
@@ -261,6 +253,7 @@ pub fn spawn_camera(mut commands: Commands) {
     transform.rotate_axis(Vec3::X, (1.0 / 3.0) * -PI);
 
     commands.spawn((
+        PickingCameraBundle::default(),
         Camera3dBundle {
             transform,
             projection: Projection::Perspective(PerspectiveProjection {

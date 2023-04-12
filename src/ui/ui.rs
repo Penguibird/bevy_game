@@ -7,8 +7,10 @@ use crate::{
         building_bundles::{Building, BuildingBundle, BuildingTemplates},
         building_system::{self, building_system},
     },
-    cameras::orbit_camera::{get_primary_window_size, PanOrbitCamera},
+    cameras::pan_camera::{get_primary_window_size, PanOrbitCamera},
 };
+
+use super::building_info::{building_info, building_info_ui, BuildingInfo};
 
 #[derive(Clone, Copy)]
 pub enum ButtonType {
@@ -54,6 +56,9 @@ impl Plugin for UIPlugin {
             .add_plugin(EguiPlugin)
             .add_system(button_system)
             .add_system(ui_system)
+            .add_system(building_info)
+            .init_resource::<BuildingInfo>()
+            .add_system(building_info_ui)
             .add_system(ui_buttons)
             .add_system(building_system)
             .insert_resource(UIState {
@@ -77,9 +82,7 @@ fn lighten_color(color: Color, lighten: f32) -> Color {
 }
 
 fn ui_system(
-    mut commands: Commands,
     mut ui_state: ResMut<UIState>,
-    ass: Res<AssetServer>,
     mut ctx: ResMut<EguiContext>,
     templates: Res<BuildingTemplates>,
 ) {
@@ -121,7 +124,7 @@ fn ui_system(
                 }
                 if let BuildingBundle::DEFENSIVE(_) = b.bundle {
                     ui.horizontal(|ui| {
-                        let but = ui.selectable_label(b == b, b.name.to_string());
+                        let but = ui.selectable_label(b == b, b.building_info.name.to_string());
                         if but.clicked() {
                             ui_state.mode = UIMode::BuildingDefensive(Some(b.clone()));
                         };
@@ -137,7 +140,7 @@ fn ui_system(
                 }
                 if let BuildingBundle::GENERATOR(_) = b.bundle {
                     ui.horizontal(|ui| {
-                        let but = ui.selectable_label(b == b, b.name.to_string());
+                        let but = ui.selectable_label(b == b, b.building_info.name.to_string());
                         if but.clicked() {
                             ui_state.mode = UIMode::BuildingResources(Some(b.clone()));
                         };
@@ -194,7 +197,7 @@ fn ui_system(
     //     });
 }
 
-fn spawn_button(
+fn _spawn_button(
     parent: &mut ChildBuilder,
     ass: &Res<AssetServer>,
     button: MyButton,
@@ -275,7 +278,7 @@ fn button_system(
     >,
     mut ev_writer: EventWriter<ButtonEvent>,
 ) {
-    for (i, style, mut b, mut bacground_color) in interaction_query.iter_mut() {
+    for (i, _style, mut b, mut bacground_color) in interaction_query.iter_mut() {
         ev_writer.send(ButtonEvent {
             interaction: *i,
             button_type: b.button_type,
@@ -321,7 +324,7 @@ fn button_system(
 }
 
 fn ui_buttons(mut query: Query<(&mut MyButton, &mut BackgroundColor)>, ui_state: Res<UIState>) {
-    for (mut button, mut bc) in query.iter_mut() {
+    for (mut button, _bc) in query.iter_mut() {
         if let Some(bm) = &button.mode {
             if *bm != ui_state.mode {
                 button.toggled = Some(false);

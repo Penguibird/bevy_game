@@ -3,37 +3,13 @@ use std::{f32::consts::PI, time::Duration};
 use bevy::prelude::*;
 use bevy_tweening::{
     lens::{TransformPositionLens, TransformRotateXLens},
-    Animator, EaseFunction, Lens, Tracks, Tween,
+    Animator, EaseFunction, Tracks, Tween,
 };
 
-use super::muzzleflash::GunType;
-struct RelativeTransformPositionLens {
-    previous: Vec3,
-    start: Vec3,
-    end: Vec3,
-}
-
-impl Lens<Transform> for RelativeTransformPositionLens {
-    fn lerp(&mut self, target: &mut Transform, ratio: f32) {
-        let value = self.start + (self.end - self.start) * ratio;
-        target.translation += value - self.previous;
-        self.previous = value;
-    }
-}
-
-struct RelativeTransformRotateXLens {
-    previous: f32,
-    start: f32,
-    end: f32,
-}
-
-impl Lens<Transform> for RelativeTransformRotateXLens {
-    fn lerp(&mut self, target: &mut Transform, ratio: f32) {
-        let angle = (self.end - self.start).mul_add(ratio, self.start);
-        target.rotate_local_x(angle - self.previous);
-        self.previous = angle;
-    }
-}
+use super::{
+    muzzleflash::GunType,
+    relative_lenses::{RelativeTransformPositionLens, RelativeTransformRotateXLens},
+};
 
 pub fn get_laser_gun_hover_animator() -> impl Bundle {
     let duration = Duration::from_millis(4000);

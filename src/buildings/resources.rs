@@ -55,7 +55,7 @@ impl PartialOrd for ResourceSet {
             .zip(other.vec.iter())
             .all(|(x, y)| x.1 < y.1)
     }
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, _other: &Self) -> Option<std::cmp::Ordering> {
         return None;
         // if self.vec.iter().zip(other.vec).all(|(x, y)| x.1 < y.1) { return Ordering::Less;
         // } else {
@@ -66,7 +66,7 @@ impl PartialOrd for ResourceSet {
 
 impl ResourceSet {
     pub fn sub(&mut self, rhs: &Self) -> () {
-        self.vec.iter_mut().enumerate().for_each(|(i, (r, n))| {
+        self.vec.iter_mut().enumerate().for_each(|(i, (_, n))| {
             if let Some(x) = rhs.vec.get(i) {
                 *n -= x.1;
             }

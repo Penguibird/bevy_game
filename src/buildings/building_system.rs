@@ -1,68 +1,19 @@
-use bevy::{prelude::*, utils::HashSet};
+use bevy::{
+    prelude::*,
+    utils::{HashMap, HashSet},
+};
 
 use crate::{
     cameras::{
         get_world_point_from_screen::get_plane_point_from_mouse_pos,
-        orbit_camera::{get_primary_window_size, PanOrbitCamera},
+        pan_camera::{get_primary_window_size, PanOrbitCamera},
     },
     ui::ui::{UIMode, UIState},
 };
 
 use super::{building_bundles::Building, resources::ResourceState};
 
-#[derive(Resource, Debug, Clone)]
-pub struct Grid {
-    pub blocked_squares: HashSet<(i8, i8)>,
-}
-
-pub const SQUARE_SIZE: f32 = 3.0;
-impl Grid {
-    pub fn new() -> Self {
-        Self {
-            blocked_squares: HashSet::new(),
-        }
-    }
-
-    pub fn get_square_index(point: Vec3) -> (i8, i8) {
-        let x = (point.x / SQUARE_SIZE).floor() as i8;
-        let y = (point.z / SQUARE_SIZE).floor() as i8;
-        return (x, y);
-    }
-    pub fn get_plane_pos(point: Vec3) -> Vec3 {
-        let t = Self::get_square_index(point);
-        return Vec3::new(
-            (t.0 as f32 + 0.5) * SQUARE_SIZE,
-            0.01,
-            (t.1 as f32 + 0.5) * SQUARE_SIZE,
-        );
-    }
-
-    pub fn is_square_blocked(&self, point: Vec3) -> bool {
-        self.blocked_squares
-            .contains(&Self::get_square_index(point))
-    }
-
-    pub fn get_square_info(&self, point: Vec3) -> (bool, i8, i8) {
-        let t = &Self::get_square_index(point);
-        return (self.blocked_squares.contains(t), t.0, t.1);
-    }
-
-    // pub fn getPlane(point: Vec3) -> Plane {
-    //   let (x,y) = Grid::get_square_index(point);
-
-    //   return Plane {
-
-    //   }
-    // }
-
-    pub fn block_square(&mut self, point: (i8, i8)) {
-        self.blocked_squares.insert(point);
-    }
-    pub fn block_square_vec3(&mut self, point: Vec3) {
-        self.block_square(Grid::get_square_index(point));
-    }
-}
-
+use super::grid::{Grid, SQUARE_SIZE};
 #[derive(Component)]
 pub struct HighlightSquare {}
 
@@ -128,8 +79,10 @@ pub fn building_system(
         if !grid.is_square_blocked(point) {
             if b.cost <= resources.resources {
                 resources.resources.sub(&b.cost);
-                b.clone().build(&mut commands, point);
-                grid.block_square_vec3(point);
+                let e = b.clone().build(&mut commands, point);
+                if let Some(e) = e {
+                    grid.block_square_vec3(point, e);
+                }
             }
         }
     };
