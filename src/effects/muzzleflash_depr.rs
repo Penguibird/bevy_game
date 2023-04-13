@@ -9,7 +9,7 @@ pub fn setup_muzzleflash(
     mut commands: Commands,
 ) {
     let shape = ass.load("effects/muzzleflash.png");
-    dbg!(&shape);
+    // dbg!(&shape);
     let mut gradient = Gradient::new();
     gradient.add_key(0.0, Vec2::splat(0.5));
     gradient.add_key(1.0, Vec2::splat(0.8));

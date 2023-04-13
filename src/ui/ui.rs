@@ -1,5 +1,8 @@
 use ::egui::Context;
-use bevy::{prelude::*, ui};
+use bevy::{
+    prelude::{system_adapter::unwrap, *},
+    ui,
+};
 use bevy_egui::{egui, EguiContext, EguiPlugin};
 
 use crate::{
@@ -10,7 +13,9 @@ use crate::{
     cameras::pan_camera::{get_primary_window_size, PanOrbitCamera},
 };
 
-use super::building_info::{building_info, building_info_ui, BuildingInfo};
+use super::{
+    building_info::{building_info, building_info_ui, BuildingInfo},
+};
 
 #[derive(Clone, Copy)]
 pub enum ButtonType {
@@ -86,7 +91,7 @@ fn ui_system(
     mut ctx: ResMut<EguiContext>,
     templates: Res<BuildingTemplates>,
 ) {
-    egui::Window::new("MainMenu").show(ctx.ctx_mut(), |ui| {
+    let w = egui::Window::new("MainMenu").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             let b = ui.selectable_label(
                 if let UIMode::BuildingDefensive(_) = ui_state.mode {
@@ -148,7 +153,11 @@ fn ui_system(
                 }
             });
         };
+        
     });
+    // ctx.ctx_mut().
+    // handle_ui_click(&mut res, &w);
+
     // commands
     //     .spawn(NodeBundle {
     //         style: Style {

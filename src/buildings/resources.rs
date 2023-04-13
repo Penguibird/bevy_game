@@ -2,6 +2,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin};
 
 use bevy::prelude::*;
 
+
 type Amount = u16;
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResourceSet {
@@ -144,7 +145,7 @@ pub fn resource_ui(
     // mut query: Query<(&ResourceStatus, &mut Text)>,
     mut ctx: ResMut<EguiContext>,
 ) {
-    egui::Window::new("Ore status").show(ctx.ctx_mut(), |ui| {
+    let w = egui::Window::new("Ore status").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             resources.resources.vec.iter().for_each(|(r, n)| {
                 ui.vertical(|ui| {
@@ -152,7 +153,7 @@ pub fn resource_ui(
                     ui.label(n.to_string());
                 });
             })
-        })
+        });
     });
 }
 

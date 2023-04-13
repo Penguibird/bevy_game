@@ -24,6 +24,7 @@ pub struct DeathEvent {
     pub killer: Option<Entity>,
 }
 
+
 pub fn death_timers(
     time: Res<Time>,
     mut query: Query<&mut Health>,

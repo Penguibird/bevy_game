@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use bevy_kira_audio::prelude::*;
 
 use bevy::{
     input::{
@@ -72,7 +73,6 @@ pub fn _camera_testing(
         );
 
         // vec.x = vec.x + (y - vec.x).abs();
-        dbg!(vec);
 
         commands.spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 1.1 })),
@@ -203,10 +203,6 @@ pub fn pan_orbit_camera(
             transform.rotate_y(a);
 
             // println!(" x: {}, zoomlevel: {}", x, cam.zoom_level);
-            println!(
-                "Camera at {:?}, x: {}, y: {}, tilt: {}, zoomlevel: {}",
-                transform.translation, x, y, tilt, cam.zoom_level
-            );
         }
     }
 }
@@ -254,6 +250,7 @@ pub fn spawn_camera(mut commands: Commands) {
 
     commands.spawn((
         PickingCameraBundle::default(),
+        AudioReceiver,
         Camera3dBundle {
             transform,
             projection: Projection::Perspective(PerspectiveProjection {

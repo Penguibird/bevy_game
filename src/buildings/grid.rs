@@ -54,6 +54,9 @@ impl Grid {
 
     //   }
     // }
+    pub fn get_square_count(&self) -> usize {
+        self.blocked_squares.len()
+    }
 
     pub fn update_base(&mut self) {
         let points = self.blocked_squares.keys();
@@ -85,7 +88,11 @@ impl Grid {
         let dist = self
             .blocked_squares
             .keys()
-            .map(|p| Vec2::new(p.0 as f32, p.1 as f32).distance(center_vec2).abs())
+            .map(|p| {
+                Vec2::new(p.0 as f32, p.1 as f32)
+                    .distance(center_vec2)
+                    .abs()
+            })
             .max_by(|a, b| a.total_cmp(b));
 
         self.base_center = center * SQUARE_SIZE;

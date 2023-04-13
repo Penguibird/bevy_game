@@ -2,6 +2,7 @@ use bevy::{
     prelude::*,
     utils::{HashMap, HashSet},
 };
+use bevy_egui::EguiContext;
 
 use crate::{
     cameras::{
@@ -20,6 +21,7 @@ pub struct HighlightSquare {}
 pub fn building_system(
     mut resources: ResMut<ResourceState>,
     mbutton: Res<Input<MouseButton>>,
+   mut ctx: ResMut<EguiContext>,
     windows: Res<Windows>,
     mut query_set: ParamSet<(
         Query<(&PanOrbitCamera, &Transform, &Projection)>,
@@ -33,6 +35,10 @@ pub fn building_system(
 ) {
     let cam_query = query_set.p0();
     let (cam, transform, proj) = cam_query.single();
+
+    if ctx.ctx_mut().is_pointer_over_area() {
+        return;
+    }
 
     let b: &Building;
     if let UIMode::BuildingDefensive(Some(b_)) = &ui_state.mode {
@@ -79,7 +85,7 @@ pub fn building_system(
         if !grid.is_square_blocked(point) {
             if b.cost <= resources.resources {
                 resources.resources.sub(&b.cost);
-                let e = b.clone().build(&mut commands, point);
+                let e = b.clone().build(&mut commands, Grid::get_plane_pos(point));
                 if let Some(e) = e {
                     grid.block_square_vec3(point, e);
                 }

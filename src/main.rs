@@ -2,6 +2,7 @@
 use std::f32::consts::PI;
 
 use aliens::alien::AlienPlugin;
+use audio::audio::MyAudioPlugin;
 use bevy::pbr::DirectionalLightShadowMap;
 use bevy::prelude::*;
 use bevy_rapier3d::{prelude::*, };
@@ -24,6 +25,7 @@ mod buildings;
 mod effects;
 mod health;
 mod ui;
+mod audio;
 
 fn main() {
     // let mut wgpu_settings = WgpuSettings::default();
@@ -42,6 +44,7 @@ fn main() {
         .insert_resource(Grid::new())
         // * Camera you can rotate
         .add_startup_system(spawn_camera)
+        .add_plugin(MyAudioPlugin)
         .add_system(pan_orbit_camera)
         // .add_system(camera_testing)
         // *Camera you can only move

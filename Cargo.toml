@@ -6,18 +6,45 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.9"
 bevy_hanabi = { version = "0.5.3", default-features = false, features = [ "3d" ] }
 bevy_embedded_assets = "0.6"
 bevy_tweening = "0.6"
 bevy_mod_picking = "0.11"
-bevy_kira_audio ="0.14"
 bevy_egui = "0.19"
 bevy_rapier3d = "0.20.0"
 egui = "0.21.0"
 itertools = "0.10.5"
 # bevy_particle_systems = "0.4"
 rand = "0.8.5"
+
+[dependencies.bevy]
+version = "0.9"
+default-features = false
+# These are the remaining default features other than `bevy_audio` and `vorbis`
+features = [
+  "render",
+  "animation",
+  "bevy_asset",
+  "bevy_scene",
+  "bevy_winit",
+  "bevy_gilrs",
+  "png",
+  "hdr",
+  "filesystem_watcher",
+  "x11"
+]
+
+[dependencies.bevy_kira_audio]
+version = "0.14"
+# `ogg` format support is enabled by default, disable if you don't want it
+default-features = false
+# enable the features you care about
+features = [
+  "wav",
+  "flac",
+  "mp3",
+  "ogg",
+]
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

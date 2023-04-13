@@ -75,7 +75,7 @@ pub fn defensive_buildings_targetting(
             });
             if let Some(new_target) = x {
                 speeder_target.target = Some(new_target.3);
-                println!("Speeder retargetting")
+                // println!("Speeder retargetting")
             }
         }
         if let Some(t) = speeder_target.target {
@@ -179,9 +179,12 @@ pub fn damage_dealing(
 }
 
 
+pub struct DefensiveBuildingDestroyedEvent;
+
 pub fn defensive_building_death(
     mut query: Query<(&mut Transform, Entity), With<BuildingInfoComponent>>,
     mut ev: EventReader<DeathEvent>,
+    mut ev_w: EventWriter<DefensiveBuildingDestroyedEvent>,
     mut grid: ResMut<Grid>,
     mut commands: Commands,
 ) {

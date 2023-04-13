@@ -1,11 +1,16 @@
-use std::{cmp::Ordering, f32::consts::PI, time::Duration, };
+use std::{cmp::Ordering, f32::consts::PI, time::Duration};
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity, Friction};
+use bevy_rapier3d::prelude::{
+    Collider, CollisionGroups, Friction, Group, LockedAxes, RigidBody, Velocity,
+};
 use rand::Rng;
 
 use crate::{
-    buildings::{defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting}, grid::Grid},
+    buildings::{
+        defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting},
+        grid::Grid,
+    },
     health::health::{DeathEvent, Health},
 };
 const ALIEN_SPEED: f32 = 5.;
@@ -34,8 +39,12 @@ impl Plugin for AlienPlugin {
             timer: Timer::new(ALIEN_SPAWN_TIMER, TimerMode::Repeating),
         })
         .init_resource::<AlienCount>()
+        .insert_resource(AlienModel(None))
         .add_system(alien_ai)
         .add_system(spawn_aliens)
+        .add_system(setup_alien)
+        .init_resource::<AlienSpawnAngle>()
+        .add_system(alien_spawning_randomize_angle)
         .add_system(alien_cleanup)
         .add_system(alien_death);
     }
@@ -71,65 +80,173 @@ impl Default for Alien {
 //     }
 // }
 
-pub fn spawn_aliens(
-    mut commands: Commands,
+#[derive(Resource, Clone)]
+pub struct AlienModel(Option<Handle<Scene>>);
+
+pub fn setup_alien(ass: Res<AssetServer>, mut res: ResMut<AlienModel>) {
+    let gltf = ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0");
+    res.0 = gltf.into();
+}
+pub fn get_probability_to_spawn_an_alien(
+    t: Duration,
+    building_count: u32,
+    alien_count: u32,
+) -> f32 {
+    // FOR TESTING
+    let t = t + Duration::from_secs(30);
+
+    if t < Duration::from_secs(30) {
+        return 0.;
+    }
+    //  else if t < Duration::from_secs(180) {
+    //     return (t.as_millis() as f32 - Duration::from_secs(180).as_millis() as f32 * 0.001);
+    // }
+    else {
+        let mut secs = t.as_millis() as f32 / (1000.);
+        secs -= 30.;
+        // let mut res = ((f32::sin(x.powf(1.3) / 2.)) + 0.3 + (x / 50.).powf(2.4)) * (x / 15.);
+        let x = secs;
+
+        let period = 60_f32;
+        let pow = 3;
+        let mut sawtooth = (x % period).powi(pow);
+
+        // Clamp to 1
+        sawtooth /= (period.powi(pow));
+
+        // Ramp up to full power going on to 10 minutes;
+        let final_wave_i = 10_f32;
+        let res = sawtooth * (x / (final_wave_i * period));
+
+        return res;
+    }
+}
+#[cfg(test)]
+mod test_alien_spawn_prob {
+    use std::time::Duration;
+
+    use crate::aliens::alien::get_probability_to_spawn_an_alien;
+
+    #[test]
+    fn print_probabilities_over_time() {
+        for i in 1..(30 * 60) {
+            let prob = get_probability_to_spawn_an_alien(Duration::from_millis(i * 100), 0, 0);
+            println!("{}", prob);
+        }
+
+        let total: f32 = (1..120)
+            .map(|i| get_probability_to_spawn_an_alien(Duration::from_secs(i), 0, 0))
+            .sum();
+        println!("Total: {}", total * 12.5);
+        assert_eq!(1, 1);
+    }
+}
+
+#[derive(Resource, Clone, Debug)]
+pub struct AlienSpawnAngle {
+    // The possible locations at which to spawn are given by the circle from Grid - aka base center and radius
+    // and the angle given by this.
+    // It changes periodically so that aliens come in batches
+    angle: f32,
+    // The deviation can also change over time so that aliens don't spawn at the same spot all the time
+    deviation: f32,
+    timer: Timer,
+}
+impl Default for AlienSpawnAngle {
+    fn default() -> Self {
+        AlienSpawnAngle {
+            angle: 0.0,
+            deviation: 0.5,
+            timer: Timer::new(Duration::from_secs(20), TimerMode::Repeating),
+        }
+    }
+}
+
+pub fn alien_spawning_randomize_angle(
+    mut res: ResMut<AlienSpawnAngle>,
     time: Res<Time>,
-    mut timer: ResMut<AlienSpawnTimer>,
-    ass: Res<AssetServer>,
+) {
+    res.timer.tick(time.delta());
+    if res.timer.finished() {
+        let mut rng = rand::thread_rng();
+        let min_d = 20_f32;
+        let max_d = 40_f32;
+        let dur = (rng.gen::<f32>() * (max_d-min_d  )) + min_d;
+        dbg!(dur);
+        res.timer.reset();
+        res.timer
+            .set_duration(Duration::from_millis((dur * 1000.) as u64));
+
+        // Deviation
+        let min_d = PI / 10.;
+        let max_d = PI / 5.;
+        res.deviation = (rng.gen::<f32>() * (max_d-min_d  ) + min_d);
+
+        res.angle = rng.gen::<f32>() * 2. * PI;
+    }
+}
+
+pub fn spawn_aliens(
+    angle: Res<AlienSpawnAngle>,
+    mut commands: Commands,
     mut count: ResMut<AlienCount>,
     grid: Res<Grid>,
+    model: Res<AlienModel>,
+    time: Res<Time>,
 ) {
-    timer.timer.tick(time.delta());
-    if timer.timer.finished() {
-        let gltf = ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0");
+    // let mesh: &Mesh =
+    //     Assets::get(Assets, &ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0")).unwrap();
+    let mut rng = rand::thread_rng();
 
-        // let mesh: &Mesh =
-        //     Assets::get(Assets, &ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0")).unwrap();
-        let mut rng = rand::thread_rng();
-        let angle: f32 = rng.gen::<f32>() * 2. * PI;
+    let prob = get_probability_to_spawn_an_alien(
+        time.elapsed(),
+        grid.get_square_count() as u32,
+        count.count,
+    );
 
-        dbg!(&grid);
-        
-        let mut x = grid.base_center.x + grid.center_radius * f32::cos(angle);
-        let mut z = grid.base_center.z + grid.center_radius * f32::sin(angle);
-        
-        x += rng.gen::<f32>() * 1.;
-        z += rng.gen::<f32>() * 1.;
-
-
-        println!("Spawning an alien at {}, {}", x, z);
-        count.count += 1;
-        commands
-            .spawn((
-                Alien::default(),
-                RigidBody::Dynamic,
-                Health::new(50),
-                LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z,
-                SpatialBundle {
-                    transform: Transform::from_xyz(x, 0.0, z), //.with_scale(Vec3::new(2.0,2.0,2.0)),
-                    ..default()
-                },
-                Collider::cylinder(0.4, 0.3),
-                Friction::default(),
-                CollisionGroups::new(Group::GROUP_10, Group::GROUP_1),
-                Velocity { ..default() },
-                TargetSelecting {
-                    range: 1.0,
-                    target: None,
-                },
-                DamageDealing {
-                    cooldown: Timer::from_seconds(0.5, TimerMode::Repeating),
-                    damage: 2,
-                },
-            ))
-            .with_children(|c| {
-                c.spawn((SceneBundle {
-                    scene: gltf,
-                    transform: Transform::from_xyz(-2.0, -1.0, -1.5),
-                    ..default()
-                },));
-            });
+    if rng.gen::<f32>() > prob {
+        return;
     }
+
+    let angle = angle.angle * rng.gen::<f32>() * angle.deviation;
+
+    let mut x = grid.base_center.x + grid.center_radius * f32::cos(angle);
+    let mut z = grid.base_center.z + grid.center_radius * f32::sin(angle);
+    x += rng.gen::<f32>() * 2.;
+    z += rng.gen::<f32>() * 2.;
+
+    println!("Spawning an alien at {}, {}", x, z);
+    count.count += 1;
+    commands
+        .spawn((
+            Alien::default(),
+            RigidBody::Dynamic,
+            Health::new(50),
+            LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z,
+            SpatialBundle {
+                transform: Transform::from_xyz(x, 0.0, z), //.with_scale(Vec3::new(2.0,2.0,2.0)),
+                ..default()
+            },
+            Collider::cylinder(0.4, 0.3),
+            Friction::default(),
+            CollisionGroups::new(Group::GROUP_10, Group::GROUP_1),
+            Velocity { ..default() },
+            TargetSelecting {
+                range: 2.5,
+                target: None,
+            },
+            DamageDealing {
+                cooldown: Timer::from_seconds(0.5, TimerMode::Repeating),
+                damage: 2,
+            },
+        ))
+        .with_children(|c| {
+            c.spawn((SceneBundle {
+                scene: model.0.clone().unwrap(),
+                transform: Transform::from_xyz(-2.0, -1.0, -1.5),
+                ..default()
+            },));
+        });
 }
 
 pub fn alien_ai(
@@ -162,7 +279,12 @@ pub fn alien_ai(
 }
 
 pub fn alien_death(
-    mut aliens: Query<(&mut Transform, &mut Alien, &mut Velocity, &mut DamageDealing)>,
+    mut aliens: Query<(
+        &mut Transform,
+        &mut Alien,
+        &mut Velocity,
+        &mut DamageDealing,
+    )>,
     mut ev: EventReader<DeathEvent>,
     mut count: ResMut<AlienCount>,
 ) {

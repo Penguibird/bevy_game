@@ -312,7 +312,7 @@ pub fn register_defensive(
         0.5.into(),
         1.,
         "turret_single",
-        "Machine gun mk2",
+        "Machine gun mk1",
         "",
         &ass,
         &mut ctx,
