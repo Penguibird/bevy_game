@@ -27,6 +27,8 @@ mod buildings;
 mod effects;
 mod health;
 mod ui;
+mod map;
+mod main_base;
 mod menu;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -93,8 +95,15 @@ fn main() {
                 .with_system(setup),
         )
         .add_system_set(
+            // Any in game systems
+            SystemSet::on_update(AppState::InGame)
+            .with_system(handle_main_base_gameover)
+        )
+        .add_system_set(
+            // Any map initialization
             SystemSet::on_enter(AppState::InGame)
                 .after(AppStage::RegisterResources)
+                .with_system(spawn_main_base)
                 .with_system(testing_buildings),
         )
         // .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
