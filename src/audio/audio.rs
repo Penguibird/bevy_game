@@ -1,17 +1,20 @@
 use bevy::prelude::*;
 use bevy_kira_audio::{prelude::*, Audio};
 
-use crate::health::health::{DeathEvent, Health};
+use crate::{
+    health::health::{DeathEvent, Health},
+    AppState,
+};
 
 pub struct MyAudioPlugin;
 
 impl Plugin for MyAudioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(explosion_on_death)
-            .insert_resource(SpacialAudio { max_distance: 1. })
+        app.insert_resource(SpacialAudio { max_distance: 1. })
             .init_resource::<AudioHandles>()
             .add_startup_system(register_sounds)
-            .add_plugin(AudioPlugin);
+            .add_plugin(AudioPlugin)
+            .add_system_set(SystemSet::on_update(AppState::InGame).with_system(explosion_on_death));
     }
 }
 
@@ -58,13 +61,12 @@ pub fn explosion_on_death(
         .unwrap_or(Vec3::new(0., 15., 0.));
 
     for ev in events.iter() {
-
         if let Ok((transform, sound, mut health, _)) = dying_entity.get_mut(ev.entity) {
             // Only play sound once
             if health.death_sound_played {
                 return;
             }
-            health.death_sound_played  = true;
+            health.death_sound_played = true;
 
             let distance = transform.translation.distance(camera_pos);
 

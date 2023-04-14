@@ -14,6 +14,7 @@ use crate::{
         relative_lenses::RelativeTransformPositionLens,
     },
     health::health::{DeathEvent, Health},
+    AppState,
 };
 
 use super::building_bundles::BuildingInfoComponent;
@@ -22,11 +23,14 @@ use super::grid::{Grid, SQUARE_SIZE};
 pub struct DefensiveBuildingPlugin;
 impl Plugin for DefensiveBuildingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(damage_dealing)
-            .add_system(defensive_buildings_targetting)
-            .add_system(defensive_building_death)
+        app.add_system_set(
+            SystemSet::on_update(AppState::InGame)
+                .with_system(damage_dealing)
+                .with_system(defensive_buildings_targetting)
+                .with_system(defensive_building_death)
+                .with_system(despawn_event_handling),
             // .add_event::<DespawnEvent>()
-            .add_system(despawn_event_handling);
+        );
     }
 }
 
@@ -177,8 +181,6 @@ pub fn damage_dealing(
         }
     }
 }
-
-
 
 pub fn defensive_building_death(
     mut query: Query<(&mut Transform, Entity), With<BuildingInfoComponent>>,

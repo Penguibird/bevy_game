@@ -2,6 +2,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin};
 
 use bevy::prelude::*;
 
+use crate::AppState;
 
 type Amount = u16;
 #[derive(PartialEq, Clone, Debug)]
@@ -111,9 +112,11 @@ impl ResourceState {
 
 impl Plugin for ResourcePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ResourceState::new())
-            .add_system(resource_generation)
-            .add_system(resource_ui);
+        app.insert_resource(ResourceState::new()).add_system_set(
+            SystemSet::on_update(AppState::InGame)
+                .with_system(resource_generation)
+                .with_system(resource_ui),
+        );
     }
 }
 

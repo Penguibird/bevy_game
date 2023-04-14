@@ -1,17 +1,19 @@
 use std::{cmp::Ordering, f32::consts::PI, time::Duration};
 
-use bevy::prelude::*;
+use bevy::{prelude::*, time::Stopwatch};
 use bevy_rapier3d::prelude::{
     Collider, CollisionGroups, Friction, Group, LockedAxes, RigidBody, Velocity,
 };
 use rand::Rng;
 
 use crate::{
+    audio::audio::AudioType,
     buildings::{
         defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting},
         grid::Grid,
     },
-    health::health::{DeathEvent, Health}, audio::audio::AudioType,
+    health::health::{DeathEvent, Health},
+    AppStage, AppState,
 };
 const ALIEN_SPEED: f32 = 5.;
 const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(1000);
@@ -40,13 +42,26 @@ impl Plugin for AlienPlugin {
         })
         .init_resource::<AlienCount>()
         .insert_resource(AlienModel(None))
-        .add_system(alien_ai)
-        .add_system(spawn_aliens)
-        .add_system(setup_alien)
+        .add_system_set(
+            SystemSet::on_enter(AppState::InGame)
+                .label(AppStage::RegisterResources)
+                .with_system(register_aliens),
+        )
+        .insert_resource(InGameTime {
+            timer: Stopwatch::new(),
+        })
+        .add_system_set(SystemSet::on_enter(AppState::InGame).with_system(start_in_game_time))
+        .add_system_set(SystemSet::on_pause(AppState::InGame).with_system(pause_in_game_time))
+        .add_system_set(SystemSet::on_resume(AppState::InGame).with_system(unpause_in_game_time))
         .init_resource::<AlienSpawnAngle>()
-        .add_system(alien_spawning_randomize_angle)
-        .add_system(alien_cleanup)
-        .add_system(alien_death);
+        .add_system_set(
+            SystemSet::on_update(AppState::InGame)
+                .with_system(alien_ai)
+                .with_system(spawn_aliens)
+                .with_system(alien_spawning_randomize_angle)
+                .with_system(alien_cleanup)
+                .with_system(alien_death),
+        );
     }
 }
 
@@ -59,6 +74,23 @@ impl Default for Alien {
     fn default() -> Self {
         Alien { alive: true }
     }
+}
+
+#[derive(Resource, Clone, Debug)]
+pub struct InGameTime {
+    timer: Stopwatch,
+}
+pub fn start_in_game_time(mut time: ResMut<InGameTime>) {
+    time.timer.reset();
+    time.timer.unpause();
+}
+
+pub fn pause_in_game_time(mut time: ResMut<InGameTime>) {
+    time.timer.pause();
+}
+
+pub fn unpause_in_game_time(mut time: ResMut<InGameTime>) {
+    time.timer.unpause();
 }
 
 // #[derive(Bundle)]
@@ -83,7 +115,7 @@ impl Default for Alien {
 #[derive(Resource, Clone)]
 pub struct AlienModel(Option<Handle<Scene>>);
 
-pub fn setup_alien(ass: Res<AssetServer>, mut res: ResMut<AlienModel>) {
+pub fn register_aliens(ass: Res<AssetServer>, mut res: ResMut<AlienModel>) {
     let gltf = ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0");
     res.0 = gltf.into();
 }
@@ -162,16 +194,13 @@ impl Default for AlienSpawnAngle {
     }
 }
 
-pub fn alien_spawning_randomize_angle(
-    mut res: ResMut<AlienSpawnAngle>,
-    time: Res<Time>,
-) {
+pub fn alien_spawning_randomize_angle(mut res: ResMut<AlienSpawnAngle>, time: Res<Time>) {
     res.timer.tick(time.delta());
     if res.timer.finished() {
         let mut rng = rand::thread_rng();
         let min_d = 20_f32;
         let max_d = 40_f32;
-        let dur = (rng.gen::<f32>() * (max_d-min_d  )) + min_d;
+        let dur = (rng.gen::<f32>() * (max_d - min_d)) + min_d;
         dbg!(dur);
         res.timer.reset();
         res.timer
@@ -180,7 +209,7 @@ pub fn alien_spawning_randomize_angle(
         // Deviation
         let min_d = PI / 10.;
         let max_d = PI / 5.;
-        res.deviation = (rng.gen::<f32>() * (max_d-min_d  ) + min_d);
+        res.deviation = (rng.gen::<f32>() * (max_d - min_d) + min_d);
 
         res.angle = rng.gen::<f32>() * 2. * PI;
     }
@@ -192,14 +221,14 @@ pub fn spawn_aliens(
     mut count: ResMut<AlienCount>,
     grid: Res<Grid>,
     model: Res<AlienModel>,
-    time: Res<Time>,
+    time: Res<InGameTime>,
 ) {
     // let mesh: &Mesh =
     //     Assets::get(Assets, &ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0")).unwrap();
     let mut rng = rand::thread_rng();
 
     let prob = get_probability_to_spawn_an_alien(
-        time.elapsed(),
+        time.timer.elapsed(),
         grid.get_square_count() as u32,
         count.count,
     );

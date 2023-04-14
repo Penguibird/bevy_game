@@ -17,6 +17,7 @@ use cameras::pan_camera::{pan_orbit_camera, spawn_camera};
 use effects::effects::ParticlePlugin;
 
 use health::health::{death_timers, DeathEvent};
+use menu::menu::MenuPlugin;
 use ui::ui::UIPlugin;
 mod cameras;
 
@@ -26,6 +27,7 @@ mod buildings;
 mod effects;
 mod health;
 mod ui;
+mod menu;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum AppState {
@@ -33,6 +35,12 @@ enum AppState {
     InGame,
     GameOver,
     Paused,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemLabel)]
+enum AppStage {
+    // Anything that sets up a Res object to add Handles to it.
+    RegisterResources,
 }
 
 fn main() {
@@ -74,11 +82,22 @@ fn main() {
         //
         // Health management
         .add_event::<DeathEvent>()
-        .add_system(death_timers)
+        .add_system_set(SystemSet::on_update(AppState::InGame).with_system(death_timers))
+        // 
+        // Main menu as well as any other state changing menus
+        .add_plugin(MenuPlugin)
         //
         // Setup and testing
-        .add_startup_system(setup)
-        .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
+        .add_system_set(
+            SystemSet::on_enter(AppState::InGame)
+                .with_system(setup),
+        )
+        .add_system_set(
+            SystemSet::on_enter(AppState::InGame)
+                .after(AppStage::RegisterResources)
+                .with_system(testing_buildings),
+        )
+        // .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
         .run();
 }
 

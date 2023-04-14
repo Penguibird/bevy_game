@@ -9,8 +9,10 @@ use bevy_mod_picking::PickableBundle;
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, RigidBody};
 
 use crate::{
+    audio::audio::AudioType,
     effects::{gun_idle_animations::get_laser_gun_hover_animator, muzzleflash::GunType},
-    health::{self, health::Health}, audio::audio::AudioType,
+    health::{self, health::Health},
+    AppStage, AppState,
 };
 
 use super::{
@@ -79,8 +81,10 @@ impl Building {
             show_in_menu: true,
             building_info: BuildingInfoComponent {
                 name,
-                image: ctx
-                    .add_image(ass.load(format!("spacekit_2/Isometric_trimmed/{}_SE.png", model_name))),
+                image: ctx.add_image(ass.load(format!(
+                    "spacekit_2/Isometric_trimmed/{}_SE.png",
+                    model_name
+                ))),
                 description,
             },
             bundle: BuildingBundle::DEFENSIVE(DefensiveBuildingBundle {
@@ -190,9 +194,13 @@ impl Plugin for BuildingTemplatesPlugin {
         app.insert_resource(BuildingTemplates {
             templates: Vec::new(),
         })
-        .add_startup_system(register_defensive)
-        .add_startup_system(register_main_base)
-        .add_startup_system(register_resources);
+        .add_system_set(
+            SystemSet::on_enter(AppState::InGame)
+                .label(AppStage::RegisterResources)
+                .with_system(register_defensive)
+                .with_system(register_main_base)
+                .with_system(register_resources),
+        );
     }
 }
 
