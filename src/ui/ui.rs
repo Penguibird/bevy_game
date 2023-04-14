@@ -32,6 +32,7 @@ pub struct UIState {
 #[derive(Debug, PartialEq)]
 pub enum UIMode {
     Panning,
+    Destroying,
     BuildingDefensive(Option<Building>),
     BuildingResources(Option<Building>),
 }
@@ -116,6 +117,12 @@ fn ui_system(
             if b.clicked() {
                 ui_state.mode = UIMode::BuildingResources(None);
             }
+
+            let b = ui.selectable_label(ui_state.mode == UIMode::Destroying, "Demolish");
+            if b.clicked() {
+                ui_state.mode = UIMode::Destroying;
+            }
+
             let a = ui.selectable_label(ui_state.mode == UIMode::Panning, "Pan");
 
             if a.clicked() {

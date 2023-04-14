@@ -179,12 +179,10 @@ pub fn damage_dealing(
 }
 
 
-pub struct DefensiveBuildingDestroyedEvent;
 
 pub fn defensive_building_death(
     mut query: Query<(&mut Transform, Entity), With<BuildingInfoComponent>>,
     mut ev: EventReader<DeathEvent>,
-    mut ev_w: EventWriter<DefensiveBuildingDestroyedEvent>,
     mut grid: ResMut<Grid>,
     mut commands: Commands,
 ) {
@@ -195,9 +193,11 @@ pub fn defensive_building_death(
             let end = Vec3::new(0., -3., 0.);
             let point = t.translation.clone();
             grid.unblock_square_vec3(point);
+
+            // Death animation
             let tween = Tween::new(
-                EaseFunction::BounceIn,
-                Duration::from_millis(1000),
+                EaseFunction::QuadraticOut,
+                Duration::from_millis(250),
                 RelativeTransformPositionLens {
                     previous: start,
                     start,

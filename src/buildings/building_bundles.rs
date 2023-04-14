@@ -10,7 +10,7 @@ use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, RigidBody};
 
 use crate::{
     effects::{gun_idle_animations::get_laser_gun_hover_animator, muzzleflash::GunType},
-    health::{self, health::Health},
+    health::{self, health::Health}, audio::audio::AudioType,
 };
 
 use super::{
@@ -121,7 +121,10 @@ impl Building {
             transform: self.scene_offset,
             ..default()
         };
-        let x = (
+
+        // The bundle to be inserted into every building
+        let default_bundle = (
+            AudioType::Building,
             PickableBundle::default(),
             self.building_info,
             RigidBody::Fixed,
@@ -141,7 +144,7 @@ impl Building {
             BuildingBundle::DEFENSIVE(b) => {
                 let g = b.gun_type.clone();
 
-                let mut c = commands.spawn((x, b));
+                let mut c = commands.spawn((default_bundle, b));
 
                 if g == GunType::LaserGun {
                     c.insert(get_laser_gun_hover_animator());
@@ -155,7 +158,7 @@ impl Building {
             }
             BuildingBundle::GENERATOR(b) => {
                 return commands
-                    .spawn((b, x))
+                    .spawn((b, default_bundle))
                     .with_children(|parent| {
                         parent.spawn(scene);
                     })

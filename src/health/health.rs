@@ -5,6 +5,8 @@ pub struct Health {
     pub max_hp: i32,
     pub hp: i32,
     pub dead_for_timer: Timer,
+    // Used to only play death sound once per death because the death event can be triggered multiple times per tick
+    pub death_sound_played: bool,
 }
 
 impl Health {
@@ -13,6 +15,7 @@ impl Health {
             max_hp: hp,
             hp,
             dead_for_timer: Timer::from_seconds(1.0, TimerMode::Once),
+            death_sound_played: false,
         };
         h.dead_for_timer.pause();
         return h;

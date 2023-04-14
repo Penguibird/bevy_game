@@ -5,7 +5,7 @@ use aliens::alien::AlienPlugin;
 use audio::audio::MyAudioPlugin;
 use bevy::pbr::DirectionalLightShadowMap;
 use bevy::prelude::*;
-use bevy_rapier3d::{prelude::*, };
+use bevy_rapier3d::prelude::*;
 
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity};
 use buildings::building_bundles::{register_defensive, BuildingTemplates, BuildingTemplatesPlugin};
@@ -21,11 +21,19 @@ use ui::ui::UIPlugin;
 mod cameras;
 
 mod aliens;
+mod audio;
 mod buildings;
 mod effects;
 mod health;
 mod ui;
-mod audio;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum AppState {
+    MainMenu,
+    InGame,
+    GameOver,
+    Paused,
+}
 
 fn main() {
     // let mut wgpu_settings = WgpuSettings::default();
@@ -35,41 +43,42 @@ fn main() {
 
     App::new()
         .add_plugins(DefaultPlugins)
-        // .add_plugin(EguiPlugin)
-        .add_plugin(AlienPlugin)
-        // .add_system(test_muzzleflash)
-        .add_plugin(ResourcePlugin)
         .insert_resource(Msaa::default())
         .insert_resource(DirectionalLightShadowMap { size: 50 })
+        .add_state(AppState::MainMenu)
+        //
+        // Physics
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
+        .add_event::<CollisionEvent>()
+        //
+        // Camera and worldclicking
         .insert_resource(Grid::new())
         // * Camera you can rotate
         .add_startup_system(spawn_camera)
-        .add_plugin(MyAudioPlugin)
-        .add_system(pan_orbit_camera)
-        // .add_system(camera_testing)
-        // *Camera you can only move
-        // .add_startup_system(spawn_camera)
-        // .add_system(move_camera)
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(RapierDebugRenderPlugin::default())
-        .add_plugin(BuildingTemplatesPlugin)
-        .add_plugin(UIPlugin)
-        // .add_system(speeder_spawning)
-        // .add_system(update_positions)
-        // .add_system(check_for_collisions.before(update_positions))
-        .add_event::<CollisionEvent>()
-        .add_event::<DeathEvent>()
-        // .add_event::<BuildEvent>()
-        .add_startup_system(setup)
         .add_event::<WorldClickEvent>()
         .add_system(emit_world_click_events)
-        .add_system(death_timers)
+        .add_system(pan_orbit_camera)
+        //
+        // Building
+        .add_plugin(BuildingTemplatesPlugin)
         .add_plugin(ParticlePlugin)
         .add_plugin(DefensiveBuildingPlugin)
-        // .add_plugins(DefaultPickingPlugins)
-        // .add_plugin(DebugCursorPickingPlugin)
+        .add_plugin(UIPlugin)
+        // Aliens
+        .add_plugin(AlienPlugin)
+        // Resource management
+        .add_plugin(ResourcePlugin)
+        // Audio
+        .add_plugin(MyAudioPlugin)
+        //
+        // Health management
+        .add_event::<DeathEvent>()
+        .add_system(death_timers)
+        //
+        // Setup and testing
+        .add_startup_system(setup)
         .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
-        // .add_system(speeder_death)
         .run();
 }
 
@@ -78,6 +87,7 @@ fn testing_buildings(
     mut commands: Commands,
     mut grid: ResMut<Grid>,
 ) {
+    // Spawn all defined buildings in a row in the middle of hte base
     for (i, b) in building_templates.templates.iter().enumerate() {
         let point = Vec3::new(0.0 + (SQUARE_SIZE * i as f32), 0., 5.0);
         let e = b.clone().build(&mut commands, Grid::get_plane_pos(point));
@@ -92,7 +102,8 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // plane
+    // Todo replace with proper map
+    // Spawn basic plane
     println!("Startup system");
     commands
         .spawn((PbrBundle {
@@ -110,21 +121,7 @@ fn setup(
                 Friction::default(),
             ));
         });
-    // cube
-    // commands.spawn(PbrBundle {
-    //     mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-    //     material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-    //     transform: Transform::from_xyz(0.0, 0.5, 0.0),
-    //     ..default()
-    // });
-
-    // let _my_gltf = ass.load("spacekit_2/Models/GLTF format/turret_single.glb#Scene0");
-
-    // to position our 3d model, simply use the Transform
-    // in the SceneBundle
-    // TODO Spawn base
-
-    // light
+    // Spawn light
     commands.spawn(DirectionalLightBundle {
         transform: Transform::from_matrix(Mat4::from_rotation_translation(
             Quat::from_rotation_x(-0.4 * PI) * Quat::from_rotation_y(-0.15 * PI),

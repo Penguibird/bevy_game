@@ -11,7 +11,7 @@ use crate::{
         defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting},
         grid::Grid,
     },
-    health::health::{DeathEvent, Health},
+    health::health::{DeathEvent, Health}, audio::audio::AudioType,
 };
 const ALIEN_SPEED: f32 = 5.;
 const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(1000);
@@ -221,6 +221,7 @@ pub fn spawn_aliens(
         .spawn((
             Alien::default(),
             RigidBody::Dynamic,
+            AudioType::Alien,
             Health::new(50),
             LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z,
             SpatialBundle {

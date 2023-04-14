@@ -9,6 +9,7 @@ use crate::{
         get_world_point_from_screen::get_plane_point_from_mouse_pos,
         pan_camera::{get_primary_window_size, PanOrbitCamera},
     },
+    health::health::DeathEvent,
     ui::ui::{UIMode, UIState},
 };
 
@@ -21,7 +22,7 @@ pub struct HighlightSquare {}
 pub fn building_system(
     mut resources: ResMut<ResourceState>,
     mbutton: Res<Input<MouseButton>>,
-   mut ctx: ResMut<EguiContext>,
+    mut ctx: ResMut<EguiContext>,
     windows: Res<Windows>,
     mut query_set: ParamSet<(
         Query<(&PanOrbitCamera, &Transform, &Projection)>,
@@ -32,6 +33,7 @@ pub fn building_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut grid: ResMut<Grid>,
     mut commands: Commands,
+    mut death_events: EventWriter<DeathEvent>,
 ) {
     let cam_query = query_set.p0();
     let (cam, transform, proj) = cam_query.single();
@@ -40,14 +42,12 @@ pub fn building_system(
         return;
     }
 
-    let b: &Building;
-    if let UIMode::BuildingDefensive(Some(b_)) = &ui_state.mode {
-        b = b_;
-    } else if let UIMode::BuildingResources(Some(b_)) = &ui_state.mode {
-        b = b_;
-    } else {
-        return;
-    }
+    match &ui_state.mode {
+        UIMode::BuildingDefensive(_) | UIMode::BuildingResources(_) | UIMode::Destroying => {}
+        _ => {
+            return;
+        }
+    };
 
     let screen_size_half = get_primary_window_size(&windows) / 2.0;
     let m_pos = windows
@@ -82,14 +82,30 @@ pub fn building_system(
     }
 
     if mbutton.just_pressed(MouseButton::Left) {
-        if !grid.is_square_blocked(point) {
-            if b.cost <= resources.resources {
-                resources.resources.sub(&b.cost);
-                let e = b.clone().build(&mut commands, Grid::get_plane_pos(point));
-                if let Some(e) = e {
-                    grid.block_square_vec3(point, e);
+        match &ui_state.mode {
+            UIMode::BuildingDefensive(Some(b)) | UIMode::BuildingResources(Some(b)) => {
+                if !grid.is_square_blocked(point) {
+                    if b.cost <= resources.resources {
+                        resources.resources.sub(&b.cost);
+                        let e = b.clone().build(&mut commands, Grid::get_plane_pos(point));
+                        if let Some(e) = e {
+                            grid.block_square_vec3(point, e);
+                        }
+                    }
                 }
             }
-        }
+            UIMode::Destroying => {
+                let entity = grid.get_entity(point);
+                if let Some(entity) = entity {
+                    death_events.send(DeathEvent {
+                        entity: *entity,
+                        killer: None,
+                    })
+                }
+            }
+            _ => {
+                return;
+            }
+        };
     };
 }
