@@ -12,6 +12,7 @@ use crate::{
     audio::audio::AudioType,
     effects::{gun_idle_animations::get_laser_gun_hover_animator, muzzleflash::GunType},
     health::{self, health::Health},
+    ui::building_info,
     AppStage, AppState,
 };
 
@@ -128,6 +129,7 @@ impl Building {
 
         // The bundle to be inserted into every building
         let default_bundle = (
+            self.cost,
             AudioType::Building,
             PickableBundle::default(),
             self.building_info,
@@ -219,7 +221,7 @@ pub fn register_main_base(
         bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
             health: Health::new(1000),
             alien_target: AlienTarget { priority: 8 },
-            generator: ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 1000),
+            generator: ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 10_000),
             collider: Collider::cuboid(1.1 * 0.8, 2.0 * 0.8, 1.28),
         }),
         cost: ResourceSet::new(0, 0, 0),
@@ -247,7 +249,7 @@ pub fn register_defensive(
 ) {
     templates.templates.push(Building::new_defensive(
         100,
-        ResourceSet::new(10, 40, 0),
+        ResourceSet::new(100, 40, 3),
         30,
         500,
         3. * MACHINE_GUN_RANGE,
@@ -260,28 +262,25 @@ pub fn register_defensive(
         &ass,
         &mut ctx,
     ));
-    // templates.templates.push(Building {
-    //     show_in_menu: true,
-    //     name: String::from("LaserSpeeder"),
-    //     bundle: BuildingBundle::DEFENSIVE(DefensiveBuildingBundle {
-    //         gun_type: GunType::LaserGun,
-    //         target_selecting: TargetSelecting::new(3. * MACHINE_GUN_RANGE),
-    //         health: Health::new(100),
-    //         alien_target: AlienTarget { priority: 4 },
-    //         damage_dealing: DamageDealing::new(30, 500),
-    //         collider: Collider::cylinder(1.0, 0.5 * 1.15),
-    //     }),
-    //     scene_handle: ass.load("spacekit_2/Models/GLTF format/craft_speederA.glb#Scene0"),
-    //     scene_offset: Transform {
-    //         scale: Vec3::all(0.4),
-    //         translation: Vec3::new(-2., 0.0, -1.5) * 0.4,
-    //         ..Default::default()
-    //     },
-    // });
+    templates.templates.push(Building::new_defensive(
+        100,
+        ResourceSet::new(50, 0, 0),
+        30,
+        100,
+        MACHINE_GUN_RANGE,
+        GunType::MachineGun,
+        (0.5 * 1.15).into(),
+        1.,
+        "turret_single",
+        "Machine gun mk1",
+        "",
+        &ass,
+        &mut ctx,
+    ));
 
     templates.templates.push(Building::new_defensive(
         100,
-        ResourceSet::new(20, 10, 0),
+        ResourceSet::new(200, 10, 0),
         30,
         100,
         MACHINE_GUN_RANGE,
@@ -294,61 +293,50 @@ pub fn register_defensive(
         &ass,
         &mut ctx,
     ));
-    // templates.templates.push(Building { show_in_menu: true,
-    //     name: String::from("MachineGunMk2"),
-    //     bundle: BuildingBundle::DEFENSIVE(DefensiveBuildingBundle {
-    //         gun_type: GunType::MachineGunMk2,
-    //         target_selecting: TargetSelecting::new(MACHINE_GUN_RANGE),
-    //         health: Health::new(100),
-    //         alien_target: AlienTarget { priority: 4 },
-    //         damage_dealing: DamageDealing::new(30, 100),
-    //         collider: Collider::cylinder(1.0, 0.5 * 1.15),
-    //     }),
-    //     scene_handle: ass.load("spacekit_2/Models/GLTF format/turret_double.glb#Scene0"),
-    //     cost: ResourceSet::new(20, 10, 0),
-    //     scene_offset: Transform {
-    //         // TODO Scale
-    //         scale: Vec3::all(1.15),
-    //         translation: Vec3::new(-2., 0.0, -1.5) * 1.15,
-    //         ..Default::default()
-    //     },
-    // });
-    templates.templates.push(Building::new_defensive(
-        100,
-        ResourceSet::new(5, 0, 0),
-        10,
-        250,
-        MACHINE_GUN_RANGE,
-        GunType::MachineGun,
-        0.5.into(),
-        1.,
-        "turret_single",
-        "Machine gun mk1",
-        "",
-        &ass,
-        &mut ctx,
-    ));
-    // templates.templates.push(Building {
-    //     show_in_menu: true,
-    //     name: String::from("MachineGunMk1"),
-    //     bundle: BuildingBundle::DEFENSIVE(DefensiveBuildingBundle {
-    //         gun_type: GunType::MachineGun,
-    //         target_selecting: TargetSelecting::new(MACHINE_GUN_RANGE),
-    //         health: Health::new(100),
-    //         alien_target: AlienTarget { priority: 4 },
-    //         damage_dealing: DamageDealing::new(10, 250),
-    //         collider: Collider::cylinder(1.0, 0.5),
-    //     }),
-    //     scene_handle: ass.load("spacekit_2/Models/GLTF format/turret_single.glb#Scene0"),
-    //     cost: ResourceSet::new(5, 0, 0),
-    //     scene_offset: Transform {
-    //         // scale: Vec3::new(0.8, 0.8, 0.8),
-    //         translation: Vec3::new(-2., 0.0, -1.5),
-    //         ..Default::default()
-    //     },
-    // });
     // TODO Add more buildings
     // TODO Tie this to buttons
+}
+
+impl Building {
+    pub fn new_resource(
+        name: &'static str,
+        description: &'static str,
+        generator: ResourceGenerator,
+        health: i32,
+        cost: ResourceSet,
+        model_name: &str,
+        scale: f32,
+        ass: &Res<AssetServer>,
+        ctx: &mut ResMut<EguiContext>,
+    ) -> Self {
+        Building {
+            show_in_menu: true,
+            building_info: BuildingInfoComponent {
+                name,
+                image: ctx.add_image(ass.load(format!(
+                    "spacekit_2/Isometric_trimmed/{}_SE.png",
+                    model_name
+                ))),
+                description,
+            },
+            bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
+                health: Health::new(health),
+                alien_target: AlienTarget::default(),
+                generator,
+                collider: Collider::cylinder(1.0, 0.5 * scale),
+            }),
+            cost,
+            scene_handle: ass.load(format!(
+                "spacekit_2/Models/GLTF format/{}.glb#Scene0",
+                model_name
+            )),
+            scene_offset: Transform {
+                scale: Vec3::splat(scale),
+                translation: Vec3::new(-2., 0.0, -1.5) * scale,
+                ..Default::default()
+            },
+        }
+    }
 }
 
 pub fn register_resources(
@@ -356,25 +344,72 @@ pub fn register_resources(
     ass: Res<AssetServer>,
     mut ctx: ResMut<EguiContext>,
 ) {
-    templates.templates.push(Building {
-        show_in_menu: true,
-        building_info: BuildingInfoComponent {
-            name: "Mine tier 1",
-            image: ctx.add_image(ass.load("spacekit_2/Isometric/monorail_trainCargo_SW.png")),
-            description: "",
-        },
-        bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
-            health: Health::new(100),
-            collider: Collider::cylinder(1.0, 0.5),
-            generator: ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 1000),
-            alien_target: AlienTarget { priority: 3 },
-        }),
-        scene_handle: ass.load("spacekit_2/Models/GLTF format/monorail_trainCargo.glb#Scene0"),
-        cost: ResourceSet::new(5, 0, 0),
-        scene_offset: Transform {
-            // scale: Vec3::new(0.8, 0.8, 0.8),
-            translation: Vec3::new(-2., 0.0, -1.5),
-            ..Default::default()
-        },
-    });
+    templates.templates.push(Building::new_resource(
+        "Mine tier 1",
+        "",
+        ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 10_000),
+        100,
+        ResourceSet::new(50, 0, 0),
+        "monorail_trainCargo",
+        1.,
+        &ass,
+        &mut ctx,
+    ));
+
+    templates.templates.push(Building::new_resource(
+        "Mine tier 2",
+        "",
+        ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 10_000 / 5),
+        100,
+        ResourceSet::new(200, 50, 0),
+        "monorail_trainCargo",
+        1.5,
+        &ass,
+        &mut ctx,
+    ));
+
+    templates.templates.push(Building::new_resource(
+        "Gas collector",
+        "",
+        ResourceGenerator::new(super::resources::ResourceType::Gas, 1, 5_000),
+        100,
+        ResourceSet::new(200, 0, 0),
+        "machine_wirelessCable",
+        1.,
+        &ass,
+        &mut ctx,
+    ));
+
+    templates.templates.push(Building::new_resource(
+        "Monofractioning crystallizer",
+        "",
+        ResourceGenerator::new(super::resources::ResourceType::Crystal, 1, 5_000),
+        100,
+        ResourceSet::new(200, 50, 0),
+        "satelliteDish_detailed",
+        1.,
+        &ass,
+        &mut ctx,
+    ));
+    // templates.templates.push(Building {
+    //     show_in_menu: true,
+    //     building_info: BuildingInfoComponent {
+    //         name: "Mine tier 1",
+    //         image: ctx.add_image(ass.load("spacekit_2/Isometric/monorail_trainCargo_SW.png")),
+    //         description: "",
+    //     },
+    //     bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
+    //         health: Health::new(100),
+    //         collider: Collider::cylinder(1.0, 0.5),
+    //         generator: ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 1000),
+    //         alien_target: AlienTarget { priority: 3 },
+    //     }),
+    //     scene_handle: ass.load("spacekit_2/Models/GLTF format/monorail_trainCargo.glb#Scene0"),
+    //     cost: ResourceSet::new(5, 0, 0),
+    //     scene_offset: Transform {
+    //         // scale: Vec3::new(0.8, 0.8, 0.8),
+    //         translation: Vec3::new(-2., 0.0, -1.5),
+    //         ..Default::default()
+    //     },
+    // });
 }

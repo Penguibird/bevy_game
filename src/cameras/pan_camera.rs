@@ -1,5 +1,5 @@
-use std::f32::consts::PI;
 use bevy_kira_audio::prelude::*;
+use std::f32::consts::PI;
 
 use bevy::{
     input::{
@@ -25,6 +25,7 @@ use super::utils::get_keybd_vec;
 /// Tags an entity as capable of panning and orbiting.
 #[derive(Component)]
 pub struct PanOrbitCamera {
+    // Value between 0 and 1
     pub zoom_level: f32,
     x: f32,
 }
@@ -32,7 +33,7 @@ pub struct PanOrbitCamera {
 impl Default for PanOrbitCamera {
     fn default() -> Self {
         PanOrbitCamera {
-            zoom_level: 0.8,
+            zoom_level: 0.5,
             x: calculate_from_zoom_level(0.8).0,
         }
     }
@@ -189,7 +190,6 @@ pub fn pan_orbit_camera(
             transform.translation.y = y;
 
             // Horizontal positioning
-            // TODO Replace vecZ with vec z times from_axis_angle
             let t = -1.0 * (transform.rotation * Vec3::Z).remove_y().normalize() * (x - cam.x);
             transform.translation += t;
             cam.x = x;
@@ -216,6 +216,7 @@ const MIN_TILT: f32 = 0.185;
 const MIN_HEIGHT: f32 = 1.0;
 const MAX_HEIGHT: f32 = 80.0;
 
+// Returns (x, y, tilt)
 pub fn calculate_from_zoom_level(zoom: f32) -> (f32, f32, f32) {
     let (x, y, tilt): (f32, f32, f32);
 
@@ -243,11 +244,16 @@ pub fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
 
 /// Spawn a camera like this
 pub fn spawn_camera(mut commands: Commands) {
-    let translation = Vec3::new(-2.0, 10.5, 5.0);
 
-    let mut transform = Transform::from_translation(translation);
-    transform.rotate_axis(Vec3::X, (1.0 / 3.0) * -PI);
+    // let mut transform = Transform::from_translation(translation);
+    // transform.rotate_axis(Vec3::X, (1.0 / 3.0) * -PI);
 
+    let p = PanOrbitCamera {
+        ..Default::default()
+    };
+    let (x, y, tilt) = calculate_from_zoom_level(p.zoom_level);
+    let transform =
+        Transform::from_xyz(0., y, x+20.).with_rotation(Quat::from_axis_angle(Vec3::NEG_X, tilt));
     commands.spawn((
         PickingCameraBundle::default(),
         AudioReceiver,
@@ -260,10 +266,22 @@ pub fn spawn_camera(mut commands: Commands) {
             // camera_3d: Camera3d { clear_color: (), depth_load_op: bevy::core_pipeline::core_3d::Camera3dDepthLoadOp::Clear(()) } {},
             ..Default::default()
         },
-        PanOrbitCamera {
-            ..Default::default()
-        },
+        p,
+        // Only here for the light
+        // VisibilityBundle {..Default::default()}
     ));
+    // .with_children(|c| {
+    //     c.spawn(PointLightBundle {
+    //         point_light: PointLight {
+    //             intensity: 15_000.,
+    //             range: 50_000.,
+    //             shadows_enabled: true,
+    //             ..Default::default()
+    //         },
+    //         transform: Transform::from_xyz(0., 1., 1.),
+    //         ..default()
+    //     });
+    // });
 }
 
 // https://forum.unity.com/threads/quaternion-to-remove-pitch.822768/

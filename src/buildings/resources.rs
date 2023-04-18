@@ -1,11 +1,16 @@
-use bevy_egui::{egui, EguiContext, EguiPlugin};
+use std::fmt::Display;
+
+use bevy_egui::{
+    egui::{self, Ui},
+    EguiContext, EguiPlugin,
+};
 
 use bevy::prelude::*;
 
 use crate::AppState;
 
 type Amount = u16;
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Component)]
 pub struct ResourceSet {
     vec: Vec<(ResourceType, Amount)>,
 }
@@ -28,6 +33,30 @@ impl ResourceSet {
 
     pub fn get(&self, r: ResourceType) -> Option<Amount> {
         self.vec.iter().find(|x| x.0 == r).and_then(|x| Some(x.1))
+    }
+
+    pub fn display(&self, ui: &mut Ui, show_empty_fields: bool) {
+        ui.horizontal(|ui| {
+            for (res, amount) in
+                self.vec
+                    .iter()
+                    .filter(|r| if show_empty_fields { true } else { r.1 > 0 })
+            {
+                ui.vertical(|ui| {
+                    ui.label(res.to_string());
+                    ui.label(amount.to_string());
+                });
+            }
+        });
+    }
+
+    pub fn div(&self, rhs: Amount) -> Self {
+        let vec = self
+            .vec
+            .iter()
+            .map(|(r, n)| (*r, n / rhs))
+            .collect::<Vec<_>>();
+        Self { vec }
     }
 }
 
@@ -67,6 +96,13 @@ impl PartialOrd for ResourceSet {
 }
 
 impl ResourceSet {
+    pub fn add_set(&mut self, rhs: &Self) -> () {
+        self.vec.iter_mut().enumerate().for_each(|(i, (_, n))| {
+            if let Some(x) = rhs.vec.get(i) {
+                *n += x.1;
+            }
+        });
+    }
     pub fn sub(&mut self, rhs: &Self) -> () {
         self.vec.iter_mut().enumerate().for_each(|(i, (_, n))| {
             if let Some(x) = rhs.vec.get(i) {
@@ -101,8 +137,8 @@ impl ResourceState {
         Self {
             resources: ResourceSet {
                 vec: vec![
-                    (ResourceType::Ore, 0),
-                    (ResourceType::Gas, 0),
+                    (ResourceType::Ore, 100),
+                    (ResourceType::Gas, 10),
                     (ResourceType::Crystal, 0),
                 ],
             },
@@ -127,14 +163,14 @@ pub enum ResourceType {
     Crystal,
 }
 
-impl ToString for ResourceType {
-    fn to_string(&self) -> String {
-        match *self {
+impl Display for ResourceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match *self {
             ResourceType::Crystal => "Crystal",
             ResourceType::Gas => "Gas",
             ResourceType::Ore => "Ore",
-        }
-        .to_string()
+        };
+        return f.write_str(s);
     }
 }
 
@@ -149,14 +185,7 @@ pub fn resource_ui(
     mut ctx: ResMut<EguiContext>,
 ) {
     let w = egui::Window::new("Ore status").show(ctx.ctx_mut(), |ui| {
-        ui.horizontal(|ui| {
-            resources.resources.vec.iter().for_each(|(r, n)| {
-                ui.vertical(|ui| {
-                    ui.label(r.to_string());
-                    ui.label(n.to_string());
-                });
-            })
-        });
+        resources.resources.display(ui, true);
     });
 }
 

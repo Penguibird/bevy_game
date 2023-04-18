@@ -1,10 +1,9 @@
-use std::{cmp::Ordering, f32::consts::PI, time::Duration};
-
 use bevy::{prelude::*, time::Stopwatch};
 use bevy_rapier3d::prelude::{
     Collider, CollisionGroups, Friction, Group, LockedAxes, RigidBody, Velocity,
 };
 use rand::Rng;
+use std::{cmp::Ordering, f32::consts::PI, time::Duration};
 
 use crate::{
     audio::audio::AudioType,
@@ -16,8 +15,9 @@ use crate::{
     AppStage, AppState,
 };
 const ALIEN_SPEED: f32 = 5.;
-const ALIEN_SPAWN_TIMER: Duration = Duration::from_millis(1000);
 
+// The period at the start of the game where aliens don't spawn
+const GRACE_PERIOD: Duration = Duration::from_secs(10);
 #[derive(Resource)]
 pub struct AlienCount {
     pub count: u32,
@@ -28,18 +28,10 @@ impl Default for AlienCount {
         AlienCount { count: 0 }
     }
 }
-
-#[derive(Resource)]
-pub struct AlienSpawnTimer {
-    timer: Timer,
-}
-
 pub struct AlienPlugin;
 impl Plugin for AlienPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(AlienSpawnTimer {
-            timer: Timer::new(ALIEN_SPAWN_TIMER, TimerMode::Repeating),
-        })
+        app
         .init_resource::<AlienCount>()
         .insert_resource(AlienModel(None))
         .add_system_set(
@@ -127,7 +119,7 @@ pub fn get_probability_to_spawn_an_alien(
     // FOR TESTING
     let t = t + Duration::from_secs(30);
 
-    if t < Duration::from_secs(30) {
+    if t < GRACE_PERIOD {
         return 0.;
     }
     //  else if t < Duration::from_secs(180) {
@@ -135,7 +127,7 @@ pub fn get_probability_to_spawn_an_alien(
     // }
     else {
         let mut secs = t.as_millis() as f32 / (1000.);
-        secs -= 30.;
+        secs -= GRACE_PERIOD.as_secs_f32();
         // let mut res = ((f32::sin(x.powf(1.3) / 2.)) + 0.3 + (x / 50.).powf(2.4)) * (x / 15.);
         let x = secs;
 

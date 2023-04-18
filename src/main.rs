@@ -5,6 +5,7 @@ use aliens::alien::AlienPlugin;
 use audio::audio::MyAudioPlugin;
 use bevy::pbr::DirectionalLightShadowMap;
 use bevy::prelude::*;
+use bevy_rapier3d::na::Point;
 use bevy_rapier3d::prelude::*;
 
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, LockedAxes, RigidBody, Velocity};
@@ -17,8 +18,12 @@ use cameras::pan_camera::{pan_orbit_camera, spawn_camera};
 use effects::effects::ParticlePlugin;
 
 use health::health::{death_timers, DeathEvent};
+use main_base::main_base::{handle_main_base_gameover, spawn_main_base};
+use map::map::generate_map;
 use menu::menu::MenuPlugin;
 use ui::ui::UIPlugin;
+
+use crate::map::map::MAP_SIZE;
 mod cameras;
 
 mod aliens;
@@ -26,13 +31,13 @@ mod audio;
 mod buildings;
 mod effects;
 mod health;
-mod ui;
-mod map;
 mod main_base;
+mod map;
 mod menu;
+mod ui;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum AppState {
+pub enum AppState {
     MainMenu,
     InGame,
     GameOver,
@@ -54,7 +59,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(Msaa::default())
-        .insert_resource(DirectionalLightShadowMap { size: 50 })
+        .insert_resource(DirectionalLightShadowMap { size: 8_000 })
         .add_state(AppState::MainMenu)
         //
         // Physics
@@ -85,26 +90,23 @@ fn main() {
         // Health management
         .add_event::<DeathEvent>()
         .add_system_set(SystemSet::on_update(AppState::InGame).with_system(death_timers))
-        // 
+        //
         // Main menu as well as any other state changing menus
         .add_plugin(MenuPlugin)
         //
         // Setup and testing
-        .add_system_set(
-            SystemSet::on_enter(AppState::InGame)
-                .with_system(setup),
-        )
+        .add_system_set(SystemSet::on_enter(AppState::InGame).with_system(setup))
         .add_system_set(
             // Any in game systems
-            SystemSet::on_update(AppState::InGame)
-            .with_system(handle_main_base_gameover)
+            SystemSet::on_update(AppState::InGame).with_system(handle_main_base_gameover),
         )
         .add_system_set(
             // Any map initialization
             SystemSet::on_enter(AppState::InGame)
                 .after(AppStage::RegisterResources)
                 .with_system(spawn_main_base)
-                .with_system(testing_buildings),
+                .with_system(generate_map)
+                // .with_system(testing_buildings),
         )
         // .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
         .run();
@@ -127,40 +129,32 @@ fn testing_buildings(
 
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    // mut meshes: ResMut<Assets<Mesh>>,
+    // mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Todo replace with proper map
-    // Spawn basic plane
     println!("Startup system");
-    commands
-        .spawn((PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane {
-                size: 50.0,
-                ..Default::default()
-            })),
-            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-            ..default()
-        },))
-        .with_children(|c| {
-            c.spawn((
-                Transform::from_xyz(0.0, -0.02, 0.0),
-                Collider::cuboid(50.0, 0.01, 50.0),
-                Friction::default(),
-            ));
-        });
+
     // Spawn light
     commands.spawn(DirectionalLightBundle {
-        transform: Transform::from_matrix(Mat4::from_rotation_translation(
-            Quat::from_rotation_x(-0.4 * PI) * Quat::from_rotation_y(-0.15 * PI),
-            Vec3::new(0.0, 10.0, 0.0),
-        )),
+        transform: Transform::from_rotation(
+            Quat::from_axis_angle(Vec3::X, -PI / 4.) * Quat::from_axis_angle(Vec3::Y, -PI / 6.),
+        ),
         directional_light: DirectionalLight {
-            illuminance: 10_000.0,
+            illuminance: 40_000.,
             shadows_enabled: true,
-
             ..Default::default()
         },
-        ..default()
+        ..Default::default()
     });
+    // commands.spawn(PointLightBundle {
+    //     transform: Transform::from_xyz(0.0, 100.0, 500.),
+    //     point_light: PointLight {
+    //         intensity: 20_000.,
+    //         shadows_enabled: true,
+    //         range: 50_000.,
+
+    //         ..Default::default()
+    //     },
+    //     ..default()
+    // });
 }

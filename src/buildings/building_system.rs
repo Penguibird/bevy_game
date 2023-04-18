@@ -13,11 +13,31 @@ use crate::{
     ui::ui::{UIMode, UIState},
 };
 
-use super::{building_bundles::Building, resources::ResourceState};
+use super::{
+    building_bundles::Building,
+    resources::{ResourceSet, ResourceState},
+};
 
 use super::grid::{Grid, SQUARE_SIZE};
 #[derive(Component)]
 pub struct HighlightSquare {}
+
+pub fn hide_highlight_square(
+    query: Query<Entity, With<HighlightSquare>>,
+    ui_state: Res<UIState>,
+    mut commands: Commands,
+) {
+    match ui_state.mode {
+        UIMode::BuildingDefensive(_) | UIMode::BuildingResources(_) | UIMode::Destroying => {}
+        UIMode::Panning => {
+            if let Ok(e) = query.get_single() {
+                if let Some(e) = commands.get_entity(e) {
+                    e.despawn_recursive();
+                }
+            };
+        }
+    }
+}
 
 pub fn building_system(
     mut resources: ResMut<ResourceState>,
@@ -28,6 +48,11 @@ pub fn building_system(
         Query<(&PanOrbitCamera, &Transform, &Projection)>,
         Query<(&mut Transform, &mut Handle<StandardMaterial>), With<HighlightSquare>>,
     )>,
+    // So that we know how many resources to refund for the destruction of the building
+    resource_cost_query: Query<
+        (&ResourceSet, Entity),
+        (Without<PanOrbitCamera>, Without<HighlightSquare>),
+    >,
     ui_state: Res<UIState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -97,6 +122,9 @@ pub fn building_system(
             UIMode::Destroying => {
                 let entity = grid.get_entity(point);
                 if let Some(entity) = entity {
+                    if let Ok((cost, ..)) = resource_cost_query.get(*entity) {
+                        resources.resources.add_set(&cost.div(2));
+                    }
                     death_events.send(DeathEvent {
                         entity: *entity,
                         killer: None,

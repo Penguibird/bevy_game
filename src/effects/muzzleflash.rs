@@ -354,7 +354,7 @@ fn spawn_muzzleflash_bundle(
         });
 }
 
-pub fn test_muzzleflash(query: Query<(&Transform, &GunType)>, mut ev_w: EventWriter<GunFireEvent>) {
+pub fn _test_muzzleflash(query: Query<(&Transform, &GunType)>, mut ev_w: EventWriter<GunFireEvent>) {
     for (t, g) in query.iter() {
         ev_w.send(GunFireEvent {
             transform: *t,

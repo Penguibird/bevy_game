@@ -1,14 +1,19 @@
+use std::fmt::format;
+
 use ::egui::Context;
 use bevy::{
     prelude::{system_adapter::unwrap, *},
     ui,
 };
-use bevy_egui::{egui, EguiContext, EguiPlugin};
+use bevy_egui::{
+    egui::{self, Id, LayerId},
+    EguiContext, EguiPlugin,
+};
 
 use crate::{
     buildings::{
         building_bundles::{Building, BuildingBundle, BuildingTemplates},
-        building_system::{self, building_system},
+        building_system::{self, building_system, hide_highlight_square},
     },
     cameras::pan_camera::{get_primary_window_size, PanOrbitCamera},
     AppState,
@@ -32,13 +37,13 @@ pub enum UIMode {
 pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_plugin(EguiPlugin)
+        app.add_plugin(EguiPlugin)
             .init_resource::<BuildingInfo>()
             .add_system_set(
                 SystemSet::on_update(AppState::InGame)
                     .with_system(building_info_ui)
                     .with_system(building_system)
+                    .with_system(hide_highlight_square)
                     .with_system(ui_system)
                     .with_system(building_info),
             )
@@ -67,7 +72,7 @@ fn ui_system(
     mut ctx: ResMut<EguiContext>,
     templates: Res<BuildingTemplates>,
 ) {
-    egui::Window::new("MainMenu").show(ctx.ctx_mut(), |ui| {
+    egui::Window::new("Buildings").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             let b = ui.selectable_label(
                 if let UIMode::BuildingDefensive(_) = ui_state.mode {
@@ -109,11 +114,27 @@ fn ui_system(
                 if !b.show_in_menu {
                     return;
                 }
-                if let BuildingBundle::DEFENSIVE(_) = b.bundle {
+                if let BuildingBundle::DEFENSIVE(bundle) = &b.bundle {
                     ui.horizontal(|ui| {
                         let but = ui.selectable_label(b == b, b.building_info.name.to_string());
                         if but.clicked() {
                             ui_state.mode = UIMode::BuildingDefensive(Some(b.clone()));
+                        };
+                        if but.hovered() {
+                            ui.vertical(|ui| {
+                                ui.image(b.building_info.image, (100., 100.));
+                                ui.label(b.building_info.description);
+                                ui.label(format!("Range: {}", bundle.target_selecting.range));
+                                ui.label(format!(
+                                    "Damage: {} every {} s",
+                                    bundle.damage_dealing.damage,
+                                    bundle.damage_dealing.cooldown.duration().as_millis() as f32
+                                        / 1000.
+                                ));
+                                ui.label(format!("Health: {}", bundle.health.max_hp));
+                                ui.label("Cost: ");
+                                b.cost.display(ui, false);
+                            });
                         };
                     });
                 }
@@ -125,11 +146,26 @@ fn ui_system(
                 if !b.show_in_menu {
                     return;
                 }
-                if let BuildingBundle::GENERATOR(_) = b.bundle {
+                if let BuildingBundle::GENERATOR(bundle) = &b.bundle {
                     ui.horizontal(|ui| {
                         let but = ui.selectable_label(b == b, b.building_info.name.to_string());
                         if but.clicked() {
                             ui_state.mode = UIMode::BuildingResources(Some(b.clone()));
+                        };
+
+                        if but.hovered() {
+                            ui.vertical(|ui| {
+                                ui.image(b.building_info.image, (100., 100.));
+                                ui.label(b.building_info.description);
+                                ui.label(format!("Generates {} of {} every {} s",
+                                    bundle.generator.amount,
+                                    bundle.generator.resource_type,
+                                    bundle.generator.timer.duration().as_millis() as f32 / 1000.,
+                                ));
+                                ui.label("Cost: ");
+                                ui.label(format!("Health: {}", bundle.health.max_hp));
+                                b.cost.display(ui, false);
+                            });
                         };
                     });
                 }
