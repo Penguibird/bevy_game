@@ -6,6 +6,10 @@ use bevy_tweening::{
     Animator, Delay, EaseFunction, Tween,
 };
 
+// All the different firing effects are defined here
+// This includes all the machine guns
+// As well as the laser speeder
+
 #[derive(Component)]
 pub struct Muzzleflash {
     pub timer: Timer,
@@ -78,6 +82,7 @@ pub fn setup_laserflash(
         material: line_mat,
     })
 }
+
 pub fn setup_muzzleflash(
     ass: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -126,6 +131,8 @@ pub fn setup_muzzleflash(
         material: line_mat,
     })
 }
+
+// The animation specific fire event
 #[derive(Clone, Copy)]
 pub struct GunFireEvent {
     pub transform: Transform,
@@ -137,6 +144,9 @@ pub enum GunType {
     MachineGunMk2,
     LaserGun,
 }
+
+// Shows the specific event based on the specific gun
+// It is wordy due to each gun having its own displacement/several flashes
 pub fn handle_gun_muzzleflash(
     mut events: EventReader<GunFireEvent>,
     res: Res<EffectsHandles>,
@@ -292,6 +302,7 @@ fn spawn_laserflash_bundle(
         });
 }
 
+// A single flash with the line coming from it. Used for both laser and machine guns
 fn spawn_muzzleflash_bundle(
     commands: &mut Commands,
     res: &Res<EffectsHandles>,
@@ -308,6 +319,7 @@ fn spawn_muzzleflash_bundle(
         },
     );
 
+    // We can't have 0 delay, so the default one is 1ms
     let delay1 = Delay::new(delay.unwrap_or(Duration::from_millis(1)));
     let delay2 = Delay::new(delay.unwrap_or(Duration::from_millis(1)));
 
@@ -354,6 +366,7 @@ fn spawn_muzzleflash_bundle(
         });
 }
 
+// Used for testing and correctly positioning the gunfire effects. Makes the guns fire all the time
 pub fn _test_muzzleflash(query: Query<(&Transform, &GunType)>, mut ev_w: EventWriter<GunFireEvent>) {
     for (t, g) in query.iter() {
         ev_w.send(GunFireEvent {
@@ -363,6 +376,7 @@ pub fn _test_muzzleflash(query: Query<(&Transform, &GunType)>, mut ev_w: EventWr
     }
 }
 
+// Despawn the muzzleflash entity after the effect runs out.
 pub fn remove_muzzleflash(
     mut query: Query<(Entity, &mut Muzzleflash)>,
     time: Res<Time>,

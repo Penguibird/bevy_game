@@ -4,6 +4,8 @@ use bevy::prelude::*;
 pub struct Health {
     pub max_hp: i32,
     pub hp: i32,
+    // Started on the actual death event, once it runs out, the entity will be cleaned up and despawned
+    // This allows us to have death animations/dead bodies for a while even after the death event
     pub dead_for_timer: Timer,
     // Used to only play death sound once per death because the death event can be triggered multiple times per tick
     pub death_sound_played: bool,
@@ -22,12 +24,15 @@ impl Health {
     }
 }
 
+// Sent when the entity dies
 pub struct DeathEvent {
     pub entity: Entity,
+    // For possible statistics implementations etc
     pub killer: Option<Entity>,
 }
 
-
+// Ticks and starts the alien death timers
+// so that we don't have to remember to tick the death timer every time we check it
 pub fn death_timers(
     time: Res<Time>,
     mut query: Query<&mut Health>,

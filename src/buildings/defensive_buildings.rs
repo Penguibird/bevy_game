@@ -20,6 +20,9 @@ use crate::{
 use super::building_bundles::BuildingInfoComponent;
 
 use super::grid::{Grid, SQUARE_SIZE};
+
+// This module defines all the defensive building functions - damage dealing, dying etc.
+
 pub struct DefensiveBuildingPlugin;
 impl Plugin for DefensiveBuildingPlugin {
     fn build(&self, app: &mut App) {
@@ -27,7 +30,7 @@ impl Plugin for DefensiveBuildingPlugin {
             SystemSet::on_update(AppState::InGame)
                 .with_system(damage_dealing)
                 .with_system(defensive_buildings_targetting)
-                .with_system(defensive_building_death)
+                .with_system(building_death)
                 .with_system(despawn_event_handling),
             // .add_event::<DespawnEvent>()
         );
@@ -51,8 +54,10 @@ impl Default for AlienTarget {
 fn distance(a: &Vec3, b: &Vec3) -> f32 {
     f32::sqrt(f32::powi((a.x - b.x), 2) + f32::powi((a.z - b.z), 2))
 }
+// Used to keep consistent targets across game ticks
 #[derive(Component, Clone, Copy, Debug)]
 pub struct TargetSelecting {
+    // The target entity that the owner of this component is currently firing at
     pub target: Option<Entity>,
     pub range: f32,
 }
@@ -65,41 +70,46 @@ impl TargetSelecting {
     }
 }
 
+// This system handles only the targeting for defensive buildings
+// ALiens are handled in alien_ai
 pub fn defensive_buildings_targetting(
-    mut speeders: Query<(&mut Transform, &mut TargetSelecting), Without<Alien>>,
+    mut defensive_buildings: Query<(&mut Transform, &mut TargetSelecting), Without<Alien>>,
     aliens: Query<(&Health, &Alien, &Transform, Entity)>,
     // muzzleflash_template: Res<MuzzleflashTemplate>,
 ) {
-    for (mut speeder_transform, mut speeder_target) in speeders.iter_mut() {
-        if let None = speeder_target.target {
-            let x = aliens.iter().find(|(_, a, t, _)| {
-                a.alive
-                    && distance(&t.translation, &speeder_transform.translation)
-                        < speeder_target.range
+    for (mut gun_transform, mut gun_target) in defensive_buildings.iter_mut() {
+        // Choose a new target if needed
+        if let None = gun_target.target {
+            let alien = aliens.iter().find(|(_, a, t, _)| {
+                a.alive && distance(&t.translation, &gun_transform.translation) < gun_target.range
             });
-            if let Some(new_target) = x {
-                speeder_target.target = Some(new_target.3);
+            if let Some(new_target) = alien {
+                gun_target.target = Some(new_target.3);
                 // println!("Speeder retargetting")
             }
         }
-        if let Some(t) = speeder_target.target {
+
+        // After target acquired, turn towards it
+        if let Some(t) = gun_target.target {
             let target = aliens.get(t);
             if let Ok(target) = target {
                 let target = target.2.translation;
-                let me = speeder_transform.translation;
+                let me = gun_transform.translation;
                 let diff = target - me;
                 let diff = diff.normalize();
 
-                let angle = diff.dot(speeder_transform.rotation.mul_vec3(Vec3::X));
-                let t = speeder_transform.translation;
-                speeder_transform.rotate_around(t, Quat::from_axis_angle(Vec3::Y, -angle));
-                let mut transform = speeder_transform.clone();
+                // Reposition the building
+                let angle = diff.dot(gun_transform.rotation.mul_vec3(Vec3::X));
+                let t = gun_transform.translation;
+                gun_transform.rotate_around(t, Quat::from_axis_angle(Vec3::Y, -angle));
+                let mut transform = gun_transform.clone();
                 transform.translation += Vec3::Y * 2.;
             }
         }
     }
 }
 
+// This system handles the actual damage dealing, for both defensive buildings and aliens
 #[derive(Component, Debug, Clone)]
 pub struct DamageDealing {
     pub damage: i32,
@@ -130,10 +140,17 @@ pub fn damage_dealing(
     mut ev: EventWriter<DeathEvent>,
     mut gun_fire_event: EventWriter<GunFireEvent>,
 ) {
-    let mut speeders = query_set.p0();
-    // let aliens = querySet.p1();
+    let mut damage_dealers = query_set.p0();
+
+    // Due to rust borrowing, we can't mutate the targets at the same time as the damage dealers, as these could overlap. 
+    // (They shouldn't in the current game implementation, but this allows the system to be more generic)
+    // We therefore store all the target info in this tuple, in the form:
+    // (target, damage, killer, hitter_translation, hitter_range)
+    // And process them afterwards
     let mut targets: Vec<(Entity, i32, Entity, Vec3, f32)> = Vec::new();
-    for (mut d, target_selecting, e, transform, gun_type) in speeders.iter_mut() {
+
+    // Figure out all the targets and necessary info
+    for (mut d, target_selecting, e, transform, gun_type) in damage_dealers.iter_mut() {
         d.cooldown.tick(time.delta());
         if !d.cooldown.just_finished() {
             continue;
@@ -158,11 +175,12 @@ pub fn damage_dealing(
         }
     }
 
-    for (target, d, killer, hitter_translation, hitter_range) in targets {
+    // Process damage dealing to the targets
+    for (target, damage, killer, hitter_translation, hitter_range) in targets {
         let mut killed = false;
         if let Ok((mut h, transform, _)) = query_set.p1().get_mut(target) {
             if transform.translation.distance(hitter_translation).abs() <= hitter_range {
-                h.hp -= d;
+                h.hp -= damage;
                 if h.hp <= 0 {
                     killed = true;
                     ev.send(DeathEvent {
@@ -176,13 +194,17 @@ pub fn damage_dealing(
         if !killed {
             continue;
         }
+        // If the target dies, the killer's target has to be reset.
         if let Ok(mut speeder) = query_set.p0().get_mut(killer) {
             speeder.1.target = None;
         }
     }
 }
 
-pub fn defensive_building_death(
+
+// Handle dying, including death animation and sounds triggering
+// This handles resource buildings as well
+pub fn building_death(
     mut query: Query<(&mut Transform, Entity), With<BuildingInfoComponent>>,
     mut ev: EventReader<DeathEvent>,
     mut grid: ResMut<Grid>,
@@ -197,6 +219,7 @@ pub fn defensive_building_death(
             grid.unblock_square_vec3(point);
 
             // Death animation
+            // Shift the building down as if it crumpled to the ground
             let tween = Tween::new(
                 EaseFunction::QuadraticOut,
                 Duration::from_millis(250),
@@ -213,8 +236,10 @@ pub fn defensive_building_death(
     }
     ev.clear();
 }
+// The animation_complete event cannot be our own user-defined event, all we get is to pass a code through. 
 const DESPAWN_EVENT_CODE: u64 = 13;
 
+// Despawn the building after the animation finishes
 pub fn despawn_event_handling(mut commands: Commands, mut ev: EventReader<TweenCompleted>) {
     for ev in ev.iter() {
         if ev.user_data == DESPAWN_EVENT_CODE {

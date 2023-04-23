@@ -19,15 +19,23 @@ use super::{
 };
 
 use super::grid::{Grid, SQUARE_SIZE};
+
+// This modules handles the user actions related to construction/demolishing of buildings
+
+// This is the square which highlights the currently hovered spot
+// It is either green or red
+// Marker component struct, no info specific to it.
 #[derive(Component)]
 pub struct HighlightSquare {}
 
+// Hide the square if we're not in a ui_mode where it should be visible
 pub fn hide_highlight_square(
     query: Query<Entity, With<HighlightSquare>>,
     ui_state: Res<UIState>,
     mut commands: Commands,
 ) {
     match ui_state.mode {
+        // In these modes it should be kept visible, i.e. do nothing to it
         UIMode::BuildingDefensive(_) | UIMode::BuildingResources(_) | UIMode::Destroying => {}
         UIMode::Panning => {
             if let Ok(e) = query.get_single() {
@@ -39,10 +47,13 @@ pub fn hide_highlight_square(
     }
 }
 
+// We can't use the worldclick event here because we need the hover position as well
+// This system handles positioning of the highlight square on the board as well as actually clicking to buid/destroy any building
 pub fn building_system(
-    mut resources: ResMut<ResourceState>,
-    mbutton: Res<Input<MouseButton>>,
     mut ctx: ResMut<EguiContext>,
+    mut resources: ResMut<ResourceState>,
+    // The info necessary to get the world positio from mouse position
+    mbutton: Res<Input<MouseButton>>,
     windows: Res<Windows>,
     mut query_set: ParamSet<(
         Query<(&PanOrbitCamera, &Transform, &Projection)>,
@@ -54,8 +65,10 @@ pub fn building_system(
         (Without<PanOrbitCamera>, Without<HighlightSquare>),
     >,
     ui_state: Res<UIState>,
+    // Technically we could predefine both the mesh and the material for the square, but we don't recreate the square often enough for this to be a significant memory leak
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+
     mut grid: ResMut<Grid>,
     mut commands: Commands,
     mut death_events: EventWriter<DeathEvent>,
@@ -63,10 +76,12 @@ pub fn building_system(
     let cam_query = query_set.p0();
     let (cam, transform, proj) = cam_query.single();
 
+    // Don't do anything if the mouse is over a menu.
     if ctx.ctx_mut().is_pointer_over_area() {
         return;
     }
 
+    // Don't do anything if we're not in an appropriate UI state
     match &ui_state.mode {
         UIMode::BuildingDefensive(_) | UIMode::BuildingResources(_) | UIMode::Destroying => {}
         _ => {
@@ -74,6 +89,7 @@ pub fn building_system(
         }
     };
 
+    // Get the values to get the world position from the mouse
     let screen_size_half = get_primary_window_size(&windows) / 2.0;
     let m_pos = windows
         .get_primary()
@@ -87,6 +103,7 @@ pub fn building_system(
     let red = materials.add(Color::rgba(0.7, 0.0, 0.0, 0.2).into());
     let mut highlight_square_query = query_set.p1();
 
+    // Get the square if it's alive, if not spawn it.
     if let Ok((mut x, mut m)) = highlight_square_query.get_single_mut() {
         x.translation = Grid::get_plane_pos(point);
         if grid.is_square_blocked(point) {
@@ -95,6 +112,9 @@ pub fn building_system(
             *m = blue;
         }
     } else {
+        // Spawn the square.
+        // If we just spawn it this tick, we actually don't do anything with it,
+        // but since we update it immediately the tick afterwards, it doesn't matter.
         let x = (
             HighlightSquare {},
             PbrBundle {
@@ -106,6 +126,7 @@ pub fn building_system(
         commands.spawn(x);
     }
 
+    // Handle building/destroying
     if mbutton.just_pressed(MouseButton::Left) {
         match &ui_state.mode {
             UIMode::BuildingDefensive(Some(b)) | UIMode::BuildingResources(Some(b)) => {

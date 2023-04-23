@@ -2,8 +2,11 @@ use std::f32::consts::PI;
 
 use bevy::prelude::*;
 use bevy_hanabi::{EffectAsset, SizeOverLifetimeModifier, Spawner, *};
+// Currently unused.
+// An attempt to get muzzleflashes using the particle system from bevy_hanabi
+// There were issues with positioning it
 
-pub fn setup_muzzleflash(
+pub fn _setup_muzzleflash(
     mut effects: ResMut<Assets<EffectAsset>>,
     ass: Res<AssetServer>,
     mut commands: Commands,

@@ -1,3 +1,6 @@
+// Unused
+// Example code used to test bevy_hanabi
+
 //! Firework
 //!
 //! This example demonstrate the use of the [`LinearDragModifier`] to slow down

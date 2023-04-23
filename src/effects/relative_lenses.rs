@@ -2,6 +2,12 @@ use bevy::prelude::*;
 use bevy::transform::components::Transform;
 use bevy_tweening::Lens;
 
+// The default lenses from bevy_tweening don't take into consideration the current transformation
+// This means that the speeder (for example) which has its own rotation based on where it's firing, 
+// would always have the entire Transform component replaced.
+// The relative lenses only change the component they're actually supposed to change, mutating the transform, rather than replacing it
+
+// A lens in bevy_tweening dictates what velues should be transformed
 pub(crate) struct RelativeTransformPositionLens {
     pub(crate) previous: Vec3,
     pub(crate) start: Vec3,

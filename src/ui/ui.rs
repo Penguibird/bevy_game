@@ -13,7 +13,7 @@ use bevy_egui::{
 use crate::{
     buildings::{
         building_bundles::{Building, BuildingBundle, BuildingTemplates},
-        building_system::{self, building_system, hide_highlight_square},
+        building_system::{self, building_system, hide_highlight_square}, resource_images::ResourceImages,
     },
     cameras::pan_camera::{get_primary_window_size, PanOrbitCamera},
     AppState,
@@ -70,6 +70,7 @@ fn lighten_color(color: Color, lighten: f32) -> Color {
 fn ui_system(
     mut ui_state: ResMut<UIState>,
     mut ctx: ResMut<EguiContext>,
+    resource_images: Res<ResourceImages>,
     templates: Res<BuildingTemplates>,
 ) {
     egui::Window::new("Buildings").show(ctx.ctx_mut(), |ui| {
@@ -133,7 +134,7 @@ fn ui_system(
                                 ));
                                 ui.label(format!("Health: {}", bundle.health.max_hp));
                                 ui.label("Cost: ");
-                                b.cost.display(ui, false);
+                                b.cost.display(ui, &resource_images, false);
                             });
                         };
                     });
@@ -162,9 +163,9 @@ fn ui_system(
                                     bundle.generator.resource_type,
                                     bundle.generator.timer.duration().as_millis() as f32 / 1000.,
                                 ));
-                                ui.label("Cost: ");
                                 ui.label(format!("Health: {}", bundle.health.max_hp));
-                                b.cost.display(ui, false);
+                                ui.label("Cost: ");
+                                b.cost.display(ui, &resource_images, false);
                             });
                         };
                     });

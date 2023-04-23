@@ -1,7 +1,7 @@
 #![allow(unused_imports, unused_parens)]
 use std::f32::consts::PI;
 
-use aliens::alien::AlienPlugin;
+use aliens::alien::{AlienPlugin, Alien};
 use audio::audio::MyAudioPlugin;
 use bevy::pbr::DirectionalLightShadowMap;
 use bevy::prelude::*;
@@ -108,11 +108,23 @@ fn main() {
                 .with_system(generate_map)
                 // .with_system(testing_buildings),
         )
+        .add_system_set(SystemSet::on_enter(AppState::GameOver).with_system(cleanup))
         // .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
         .run();
 }
 
-fn testing_buildings(
+pub fn cleanup(
+    aliens: Query<Entity, Without<Camera3d>>,
+    mut commands: Commands
+) {
+    for e in aliens.iter() {
+        if let Some(mut e) = commands.get_entity(e) {
+            e.despawn();
+        }
+    }
+}
+
+fn _testing_buildings(
     building_templates: Res<BuildingTemplates>,
     mut commands: Commands,
     mut grid: ResMut<Grid>,

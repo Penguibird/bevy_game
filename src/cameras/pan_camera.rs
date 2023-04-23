@@ -21,8 +21,10 @@ use crate::{
 
 use super::utils::get_keybd_vec;
 
+// A pan camera based on:
 ///https://bevy-cheatbook.github.io/cookbook/pan-orbit-camera.html
-/// Tags an entity as capable of panning and orbiting.
+// Allows the user to move and zoom the camera using the mouse as is typical for strategy games
+
 #[derive(Component)]
 pub struct PanOrbitCamera {
     // Value between 0 and 1
@@ -39,6 +41,8 @@ impl Default for PanOrbitCamera {
     }
 }
 
+// A utility.
+// We need to define a trait for adding methods to external structs
 trait RemoveY {
     fn remove_y(&self) -> Self;
 }
@@ -48,8 +52,8 @@ impl RemoveY for Vec3 {
     }
 }
 
-const CAMERA_PIVOT_HEIHGT: f32 = 30.0;
 
+// Spawns a cube at the point where we click in the world. Used during testing
 pub fn _camera_testing(
     mbutton: Res<Input<MouseButton>>,
     windows: Res<Windows>,
@@ -84,7 +88,8 @@ pub fn _camera_testing(
     };
 }
 
-/// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
+// The system which updates the camera position
+/// Pan the camera with mouse click, zoom with scroll wheel
 pub fn pan_orbit_camera(
     _windows: Res<Windows>,
     mut ev_motion: EventReader<MouseMotion>,
@@ -97,13 +102,12 @@ pub fn pan_orbit_camera(
 
     ui_state: Res<UIState>,
 ) {
-    // change input mapping for orbit and panning here
+    // change input mapping for panning here
     let pan_button = MouseButton::Left;
 
     let mut pan_delta = Vec2::ZERO;
     let mut m_pos: Vec2 = Vec2::ZERO;
 
-    // let mut rotation_move = Vec2::ZERO;
     let horizontal_orbit: f32 = 0.0;
     let mut scroll = 0.0;
     let key_vec = get_keybd_vec(&mut ev_keybd);
@@ -112,37 +116,28 @@ pub fn pan_orbit_camera(
         // Pan only if we're not rotating at the moment
         // Pan only if UIMode panning
         if ui_state.mode == UIMode::Panning {
-            // dbg!(ev_motion.iter().collect::<Vec<_>>());
             for ev in ev_motion.iter() {
                 pan_delta += ev.delta;
             }
-            // dbg!(mouse_pos.iter().collect::<Vec<_>>());
             for ev in mouse_pos.iter() {
                 m_pos = ev.position;
             }
         }
     }
-    // mouse_pos.clear();
-    // ev_motion.clear();
-
-    // m_pos = windows.get_primary().unwrap().cursor_position().unwrap();
     for ev in ev_scroll.iter() {
         scroll += ev.y;
     }
 
     for (mut cam, mut transform, proj) in query.iter_mut() {
-        // * Im putting else if here cause it was in the original implementation that I rewrote. Idk what it was for, but im not questioning it
+        // The else makes the maths more robust, because zooming and panning at the same time creates issues
         if let Some(vec) = key_vec {
             let r = get_quaternion_y_rotation(transform.rotation);
             transform.translation += r.mul_vec3(Vec3::new(vec.x, 0.0, vec.y) * 0.3)
         } else if pan_delta.length_squared() > 0.0 && m_pos.length_squared() > 0.0 {
-            // println!("Mouse {:?}, {:?}", pan_delta, m_pos);
             let screen_size_half = get_primary_window_size(&windows) / 2.0;
-            // println!("Screen size, {:?}", screen_size_half);
 
             let old_mouse = m_pos - pan_delta;
             let new_mouse = m_pos;
-            // dbg!(m_pos, pan_delta, old_mouse);
 
             let mut vector = (get_plane_point_from_mouse_pos(
                 old_mouse,
@@ -158,21 +153,18 @@ pub fn pan_orbit_camera(
                 &transform,
             ));
 
+            // Flip the vector
             vector.z *= -1.0;
 
             if vector.x.is_nan() || vector.y.is_nan() {
                 continue;
             }
-            // let vector = Quat::from_axis_angle(Vec3::Y, transform.rotation.to_euler(EulerRot::YXZ).0)
-            //     * vector;
-
-            // println!("Translating by {:?}", vector);
+            
+            // Found by experimentation. For whatever reason this seems to work.
             vector /= 1.3;
 
             transform.translation += vector;
-            // (proj as PerspectiveProjection)
         } else if horizontal_orbit.abs() > 0.0 {
-            // TODO Improve
             let t = transform.translation;
             let r = transform.rotation;
             transform.rotate_around(
@@ -201,8 +193,6 @@ pub fn pan_orbit_camera(
             transform.rotation = Quat::from_axis_angle(Vec3::NEG_X, tilt);
             // Add horizontal rotation to correct for the replaced val.
             transform.rotate_y(a);
-
-            // println!(" x: {}, zoomlevel: {}", x, cam.zoom_level);
         }
     }
 }
@@ -216,6 +206,7 @@ const MIN_TILT: f32 = 0.185;
 const MIN_HEIGHT: f32 = 1.0;
 const MAX_HEIGHT: f32 = 80.0;
 
+// Calculates the camera offset from its zoom level inbetween 0 and 1
 // Returns (x, y, tilt)
 pub fn calculate_from_zoom_level(zoom: f32) -> (f32, f32, f32) {
     let (x, y, tilt): (f32, f32, f32);
@@ -232,6 +223,7 @@ pub fn calculate_from_zoom_level(zoom: f32) -> (f32, f32, f32) {
     return (x, y, tilt);
 }
 
+// A utility t oget the primary window size in pixels
 pub fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
     let window = windows.get_primary();
     if let None = window {
@@ -244,10 +236,6 @@ pub fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
 
 /// Spawn a camera like this
 pub fn spawn_camera(mut commands: Commands) {
-
-    // let mut transform = Transform::from_translation(translation);
-    // transform.rotate_axis(Vec3::X, (1.0 / 3.0) * -PI);
-
     let p = PanOrbitCamera {
         ..Default::default()
     };
@@ -256,32 +244,14 @@ pub fn spawn_camera(mut commands: Commands) {
         Transform::from_xyz(0., y, x+20.).with_rotation(Quat::from_axis_angle(Vec3::NEG_X, tilt));
     commands.spawn((
         PickingCameraBundle::default(),
-        AudioReceiver,
         Camera3dBundle {
             transform,
-            projection: Projection::Perspective(PerspectiveProjection {
-                // near: f32::EPSILON,
-                ..Default::default()
-            }),
+            projection: Projection::Perspective(PerspectiveProjection::default()),
             // camera_3d: Camera3d { clear_color: (), depth_load_op: bevy::core_pipeline::core_3d::Camera3dDepthLoadOp::Clear(()) } {},
             ..Default::default()
         },
         p,
-        // Only here for the light
-        // VisibilityBundle {..Default::default()}
     ));
-    // .with_children(|c| {
-    //     c.spawn(PointLightBundle {
-    //         point_light: PointLight {
-    //             intensity: 15_000.,
-    //             range: 50_000.,
-    //             shadows_enabled: true,
-    //             ..Default::default()
-    //         },
-    //         transform: Transform::from_xyz(0., 1., 1.),
-    //         ..default()
-    //     });
-    // });
 }
 
 // https://forum.unity.com/threads/quaternion-to-remove-pitch.822768/

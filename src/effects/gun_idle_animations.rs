@@ -11,6 +11,10 @@ use super::{
     relative_lenses::{RelativeTransformPositionLens, RelativeTransformRotateXLens},
 };
 
+// All the default gun animations.
+// The main one is the laser speeder hovering in place up and down.
+// Not actually a system, this just returns a bundle to inject into the laser_gun bundle
+
 pub fn get_laser_gun_hover_animator() -> impl Bundle {
     let duration = Duration::from_millis(4000);
 
@@ -30,6 +34,8 @@ pub fn get_laser_gun_hover_animator() -> impl Bundle {
 
     let start = 0.;
     let end = -0.05 * PI;
+    
+    // We rotate it a little as it moves up and down, so that it always points towards the ground and the aliens it's firing at.
     let tween_rotate_up = Tween::new(
         EaseFunction::SineInOut,
         duration,

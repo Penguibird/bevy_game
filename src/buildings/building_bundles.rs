@@ -13,7 +13,7 @@ use crate::{
     effects::{gun_idle_animations::get_laser_gun_hover_animator, muzzleflash::GunType},
     health::{self, health::Health},
     ui::building_info,
-    AppStage, AppState,
+    AppStage, AppState, main_base::main_base::register_main_base,
 };
 
 use super::{
@@ -22,6 +22,11 @@ use super::{
 };
 
 use super::grid::{Grid, SQUARE_SIZE};
+
+// In this module we define all the possible buildings
+// There's a lot of structs holding the various info that we can then clone and insert into the world.
+
+// The bundle of components specific to the different buildign types
 #[derive(Bundle, Clone, Debug)]
 pub struct GeneratorBuildingBundle {
     pub health: Health,
@@ -45,6 +50,7 @@ pub enum BuildingBundle {
     DEFENSIVE(DefensiveBuildingBundle),
 }
 
+// The struct containing all the common information for all buildings
 #[derive(Clone, Debug)]
 pub struct Building {
     pub show_in_menu: bool,
@@ -55,14 +61,20 @@ pub struct Building {
     pub scene_handle: Handle<Scene>,
     pub scene_offset: Transform,
 }
+
+// A struct containing non-game info about the buildings. All UI stuff should go here.
 #[derive(Component, Clone, Debug)]
 pub struct BuildingInfoComponent {
+    // A static reference, because we want the names and descriptions to be on the stack during the whole runtime of the game 
     pub name: &'static str,
-    pub image: TextureId,
     pub description: &'static str,
+    pub image: TextureId,
 }
 
+
 impl Building {
+    // A factory function to abstract the common options and simplify new building creation.
+    // You can still define a new building directly, we do so for the main base for example
     fn new_defensive(
         health: i32,
         cost: ResourceSet,
@@ -120,7 +132,13 @@ impl PartialEq for Building {
 }
 
 impl Building {
+    // command pattern
+    // Doesn't take a reference to self, meaning you need to clone it before calling .build()
+    // The commands need to be passed in. We can't hold a reference to them for longer than a game tick
+    // Returns the entity built.
     pub fn build(self, commands: &mut Commands, point: Vec3) -> Option<Entity> {
+        
+        // The scene needs to be inserted as a child so it can be displaced
         let scene = SceneBundle {
             scene: self.scene_handle,
             transform: self.scene_offset,
@@ -128,6 +146,8 @@ impl Building {
         };
 
         // The bundle to be inserted into every building
+        // The default components all bundles should have.
+        // Some are static marker components, such as AudioType and RigidBody, some depend on the building info.
         let default_bundle = (
             self.cost,
             AudioType::Building,
@@ -152,6 +172,7 @@ impl Building {
 
                 let mut c = commands.spawn((default_bundle, b));
 
+                // Add the gun idle animation.
                 if g == GunType::LaserGun {
                     c.insert(get_laser_gun_hover_animator());
                 }
@@ -175,20 +196,13 @@ impl Building {
     }
 }
 
+// The global resource containing all the templates.
 #[derive(Resource)]
 pub struct BuildingTemplates {
     pub templates: Vec<Building>,
 }
-pub trait All {
-    fn all(f: f32) -> Vec3;
-}
 
-impl All for Vec3 {
-    fn all(f: f32) -> Vec3 {
-        Self { x: f, y: f, z: f }
-    }
-}
-
+// The actual registering has been split across multiple systems, so we define a plugin for all of them.
 pub struct BuildingTemplatesPlugin;
 
 impl Plugin for BuildingTemplatesPlugin {
@@ -206,42 +220,8 @@ impl Plugin for BuildingTemplatesPlugin {
     }
 }
 
-pub fn register_main_base(
-    mut templates: ResMut<BuildingTemplates>,
-    ass: Res<AssetServer>,
-    mut ctx: ResMut<EguiContext>,
-) {
-    let b = Building {
-        show_in_menu: false,
-        building_info: BuildingInfoComponent {
-            name: "Main base",
-            image: ctx.add_image(ass.load("spacekit_2/Isometric/hangar_largeA_SW.png")),
-            description: "",
-        },
-        bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
-            health: Health::new(1000),
-            alien_target: AlienTarget { priority: 8 },
-            generator: ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 10_000),
-            collider: Collider::cuboid(1.1 * 0.8, 2.0 * 0.8, 1.28),
-        }),
-        cost: ResourceSet::new(0, 0, 0),
-        scene_handle: ass.load("spacekit_2/Models/GLTF format/hangar_largeA.glb#Scene0"),
-        scene_offset: Transform {
-            scale: Vec3::new(0.8, 0.8, 0.8),
-            translation: Vec3::new(-1.6, 0.0, -1.3),
-            ..Default::default()
-        },
-    };
-
-    // b.clone()
-    //     .build(&mut commands, Grid::get_plane_pos(Vec3::ZERO));
-
-    templates.templates.push(b);
-
-    // grid.block_square_vec3(Vec3::ZERO);
-}
-
-const MACHINE_GUN_RANGE: f32 = 5.0;
+// The base range of a machine gun is defined here, which means all the other ranges can be defined relative to it
+const MACHINE_GUN_RANGE: f32 = 8.0;
 pub fn register_defensive(
     mut templates: ResMut<BuildingTemplates>,
     ass: Res<AssetServer>,
@@ -298,6 +278,9 @@ pub fn register_defensive(
 }
 
 impl Building {
+
+    // A factory function to abstract the common options and simplify new building creation.
+    // You can still define a new building directly, we do so for the main base for example
     pub fn new_resource(
         name: &'static str,
         description: &'static str,
@@ -347,7 +330,7 @@ pub fn register_resources(
     templates.templates.push(Building::new_resource(
         "Mine tier 1",
         "",
-        ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 10_000),
+        ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 2_000),
         100,
         ResourceSet::new(50, 0, 0),
         "monorail_trainCargo",
@@ -359,7 +342,7 @@ pub fn register_resources(
     templates.templates.push(Building::new_resource(
         "Mine tier 2",
         "",
-        ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 10_000 / 5),
+        ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 1_000),
         100,
         ResourceSet::new(200, 50, 0),
         "monorail_trainCargo",
@@ -391,25 +374,4 @@ pub fn register_resources(
         &ass,
         &mut ctx,
     ));
-    // templates.templates.push(Building {
-    //     show_in_menu: true,
-    //     building_info: BuildingInfoComponent {
-    //         name: "Mine tier 1",
-    //         image: ctx.add_image(ass.load("spacekit_2/Isometric/monorail_trainCargo_SW.png")),
-    //         description: "",
-    //     },
-    //     bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
-    //         health: Health::new(100),
-    //         collider: Collider::cylinder(1.0, 0.5),
-    //         generator: ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 1000),
-    //         alien_target: AlienTarget { priority: 3 },
-    //     }),
-    //     scene_handle: ass.load("spacekit_2/Models/GLTF format/monorail_trainCargo.glb#Scene0"),
-    //     cost: ResourceSet::new(5, 0, 0),
-    //     scene_offset: Transform {
-    //         // scale: Vec3::new(0.8, 0.8, 0.8),
-    //         translation: Vec3::new(-2., 0.0, -1.5),
-    //         ..Default::default()
-    //     },
-    // });
 }

@@ -43,6 +43,7 @@ impl Plugin for AlienPlugin {
             timer: Stopwatch::new(),
         })
         .add_system_set(SystemSet::on_enter(AppState::InGame).with_system(start_in_game_time))
+        .add_system_set(SystemSet::on_update(AppState::InGame).with_system(update_in_game_time))
         .add_system_set(SystemSet::on_pause(AppState::InGame).with_system(pause_in_game_time))
         .add_system_set(SystemSet::on_resume(AppState::InGame).with_system(unpause_in_game_time))
         .init_resource::<AlienSpawnAngle>()
@@ -68,6 +69,9 @@ impl Default for Alien {
     }
 }
 
+// Bevy's in built time doesn't account for game starting/ending/pausing,
+// Therefore we have this stopwatch which only runs in-game.
+// We can still use the Res<Time> for the delta 
 #[derive(Resource, Clone, Debug)]
 pub struct InGameTime {
     timer: Stopwatch,
@@ -85,24 +89,9 @@ pub fn unpause_in_game_time(mut time: ResMut<InGameTime>) {
     time.timer.unpause();
 }
 
-// #[derive(Bundle)]
-// pub struct AlienBundle {
-//     alien: Alien,
-//     scene: SceneBundle,
-//     velocity: Velocity,
-//     body: RigidBody,
-// }
-
-// impl Default for AlienBundle {
-//     fn default() -> Self {
-//         AlienBundle {
-//             alien: Alien::default(),
-// scene: SceneBundle::default(),
-//             body: RigidBody::Dynamic,
-//             velocity: Velocity::default(),
-//         }
-//     }
-// }
+pub fn update_in_game_time(t: Res<Time>,mut time: ResMut<InGameTime>) {
+    time.timer.tick(t.delta());
+}
 
 #[derive(Resource, Clone)]
 pub struct AlienModel(Option<Handle<Scene>>);
@@ -111,6 +100,9 @@ pub fn register_aliens(ass: Res<AssetServer>, mut res: ResMut<AlienModel>) {
     let gltf = ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0");
     res.0 = gltf.into();
 }
+
+// Returns a modulo-based function which spawns enemies in waves.
+// More details in the TDD
 pub fn get_probability_to_spawn_an_alien(
     t: Duration,
     building_count: u32,
@@ -121,11 +113,7 @@ pub fn get_probability_to_spawn_an_alien(
 
     if t < GRACE_PERIOD {
         return 0.;
-    }
-    //  else if t < Duration::from_secs(180) {
-    //     return (t.as_millis() as f32 - Duration::from_secs(180).as_millis() as f32 * 0.001);
-    // }
-    else {
+    } else {
         let mut secs = t.as_millis() as f32 / (1000.);
         secs -= GRACE_PERIOD.as_secs_f32();
         // let mut res = ((f32::sin(x.powf(1.3) / 2.)) + 0.3 + (x / 50.).powf(2.4)) * (x / 15.);
@@ -145,6 +133,7 @@ pub fn get_probability_to_spawn_an_alien(
         return res;
     }
 }
+// A quick test to print the probabilities of the function for a few times. Used for testing
 #[cfg(test)]
 mod test_alien_spawn_prob {
     use std::time::Duration;
@@ -186,6 +175,8 @@ impl Default for AlienSpawnAngle {
     }
 }
 
+// All the aliens should come from a similar spot, but so that they don't always come from the same one
+// we change the bearing from which they come every 20-40s 
 pub fn alien_spawning_randomize_angle(mut res: ResMut<AlienSpawnAngle>, time: Res<Time>) {
     res.timer.tick(time.delta());
     if res.timer.finished() {
@@ -246,7 +237,7 @@ pub fn spawn_aliens(
             Health::new(50),
             LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z,
             SpatialBundle {
-                transform: Transform::from_xyz(x, 0.0, z), //.with_scale(Vec3::new(2.0,2.0,2.0)),
+                transform: Transform::from_xyz(x, 0.5, z), //.with_scale(Vec3::new(2.0,2.0,2.0)),
                 ..default()
             },
             Collider::cylinder(0.4, 0.3),
@@ -265,12 +256,14 @@ pub fn spawn_aliens(
         .with_children(|c| {
             c.spawn((SceneBundle {
                 scene: model.0.clone().unwrap(),
-                transform: Transform::from_xyz(-2.0, -1.0, -1.5),
+                transform: Transform::from_xyz(-2.0, -0.5, -1.5),
                 ..default()
             },));
         });
 }
 
+// Makes the aliens target the nearest building
+// Todo consider AlienTarget.priority
 pub fn alien_ai(
     mut aliens: Query<(&Transform, &mut Velocity, &Alien, &mut TargetSelecting)>,
     targets: Query<(&Transform, &AlienTarget, Entity), Without<Alien>>,
@@ -300,6 +293,7 @@ pub fn alien_ai(
     }
 }
 
+// Disables the alien's damage dealing, plays the dying animation and schedules its despawning
 pub fn alien_death(
     mut aliens: Query<(
         &mut Transform,
@@ -324,6 +318,7 @@ pub fn alien_death(
     }
 }
 
+// Cleans up the dead aliens
 pub fn alien_cleanup(
     time: Res<Time>,
     mut query: Query<(&mut Health, Entity), With<Alien>>,
