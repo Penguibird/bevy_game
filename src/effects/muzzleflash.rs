@@ -146,7 +146,10 @@ pub enum GunType {
 }
 
 // Shows the specific event based on the specific gun
-// It is wordy due to each gun having its own displacement/several flashes
+// It is wordy due to each gun having its own displacement/several flashes, but it is very simple
+// We check the gun type based on the event and then calculate the position(s) of the muzzleflashes that should be spawned
+// Then we spawn them using the spawn_muzzleflash_bundle function
+// We add little delays to some of them to add the staggered effect of gunfire
 pub fn handle_gun_muzzleflash(
     mut events: EventReader<GunFireEvent>,
     res: Res<EffectsHandles>,
@@ -240,12 +243,20 @@ pub fn handle_gun_muzzleflash(
     }
 }
 
+// Since the spawned flashes are their own entities and not children of the gun entity
+// they can technically be a little out of position, but in practice this is barely noticeable
+// because they only last for a short time
+
+// Spawns the predefined lazerflash bundle
+// 
 fn spawn_laserflash_bundle(
     commands: &mut Commands,
     res: &Res<EffectsHandles>,
     transform: Transform,
     delay: Option<Duration>,
 ) -> () {
+
+    // To imitate the explosion of the effect, we scale it up
     let duration = Duration::from_millis(500);
     let scale = Tween::new(
         EaseFunction::QuadraticOut,
@@ -256,9 +267,11 @@ fn spawn_laserflash_bundle(
         },
     );
 
+    // The minimum duration cannot be 0, so if none was provided we use 1ms
     let delay1 = Delay::new(delay.unwrap_or(Duration::from_millis(1)));
     let delay2 = Delay::new(delay.unwrap_or(Duration::from_millis(1)));
 
+    // This is the effect for the yellow "bullet trail" line that flies off from the gun
     let fly = Tween::new(
         EaseFunction::QuadraticOut,
         duration,
@@ -302,7 +315,8 @@ fn spawn_laserflash_bundle(
         });
 }
 
-// A single flash with the line coming from it. Used for both laser and machine guns
+// A single flash with the line coming from it. Used for the machine guns
+// Very similar to above but it defines different structs with different delays
 fn spawn_muzzleflash_bundle(
     commands: &mut Commands,
     res: &Res<EffectsHandles>,

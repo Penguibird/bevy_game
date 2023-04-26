@@ -3,6 +3,7 @@ use bevy_egui::{egui, egui::*, EguiContext};
 
 use crate::AppState;
 
+// This is the main game menu that you see on the game start
 pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
@@ -22,6 +23,7 @@ impl Default for MainMenuState {
     }
 }
 
+// Renders the main menu
 fn main_menu(
     mut ui_state: ResMut<MainMenuState>,
     mut app_state: ResMut<State<AppState>>,
@@ -42,6 +44,7 @@ fn main_menu(
     });
 }
 
+// This is the game over menu that you see after losing the game
 fn game_over(
     mut app_state: ResMut<State<AppState>>,
     mut ctx: ResMut<EguiContext>,
@@ -61,6 +64,7 @@ fn game_over(
     });
 }
 
+// The exit game button, since we render it in both the main menu and the game over menu
 fn exit_game_button(ui: &mut Ui, exit: &mut EventWriter<AppExit>) {
     let b = ui.button("Exit game");
     if b.clicked() {

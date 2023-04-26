@@ -7,7 +7,7 @@ use bevy_tweening::Lens;
 // would always have the entire Transform component replaced.
 // The relative lenses only change the component they're actually supposed to change, mutating the transform, rather than replacing it
 
-// A lens in bevy_tweening dictates what velues should be transformed
+// A lens in bevy_tweening is a struct with a function that dictates what velues should be transformed
 pub(crate) struct RelativeTransformPositionLens {
     pub(crate) previous: Vec3,
     pub(crate) start: Vec3,

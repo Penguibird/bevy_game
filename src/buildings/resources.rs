@@ -154,8 +154,8 @@ impl ResourceState {
         Self {
             resources: ResourceSet {
                 vec: vec![
-                    (ResourceType::Ore, 100),
-                    (ResourceType::Gas, 10),
+                    (ResourceType::Ore, 1000),
+                    (ResourceType::Gas, 0),
                     (ResourceType::Crystal, 0),
                 ],
             },

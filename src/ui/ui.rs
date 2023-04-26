@@ -21,11 +21,16 @@ use crate::{
 
 use super::building_info::{building_info, building_info_ui, BuildingInfo};
 
+/// This module defines all the ingame menus UI
+
 #[derive(Resource, Debug)]
 
 pub struct UIState {
     pub mode: UIMode,
 }
+// This enum not only shows which tab has been selected but also which item
+// BuildingDefensive(None) means that the category has been clicked and should be expanded, 
+// but no building has been selected yet
 #[derive(Debug, PartialEq)]
 pub enum UIMode {
     Panning,
@@ -67,6 +72,7 @@ fn lighten_color(color: Color, lighten: f32) -> Color {
     };
 }
 
+// The main menu for building/demolishing/panning
 fn ui_system(
     mut ui_state: ResMut<UIState>,
     mut ctx: ResMut<EguiContext>,

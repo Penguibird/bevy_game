@@ -12,8 +12,9 @@ use crate::{
     audio::audio::AudioType,
     effects::{gun_idle_animations::get_laser_gun_hover_animator, muzzleflash::GunType},
     health::{self, health::Health},
+    main_base::main_base::register_main_base,
     ui::building_info,
-    AppStage, AppState, main_base::main_base::register_main_base,
+    AppStage, AppState,
 };
 
 use super::{
@@ -25,6 +26,20 @@ use super::grid::{Grid, SQUARE_SIZE};
 
 // In this module we define all the possible buildings
 // There's a lot of structs holding the various info that we can then clone and insert into the world.
+
+// The actual registering has been split across multiple systems, so we define a plugin for all of them.
+pub struct BuildingTemplatesPlugin;
+
+impl Plugin for BuildingTemplatesPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(BuildingTemplates {
+            templates: Vec::new(),
+        })
+        .add_startup_system(register_defensive)
+        .add_startup_system(register_main_base)
+        .add_startup_system(register_resources);
+    }
+}
 
 // The bundle of components specific to the different buildign types
 #[derive(Bundle, Clone, Debug)]
@@ -65,12 +80,11 @@ pub struct Building {
 // A struct containing non-game info about the buildings. All UI stuff should go here.
 #[derive(Component, Clone, Debug)]
 pub struct BuildingInfoComponent {
-    // A static reference, because we want the names and descriptions to be on the stack during the whole runtime of the game 
+    // A static reference, because we want the names and descriptions to be on the stack during the whole runtime of the game
     pub name: &'static str,
     pub description: &'static str,
     pub image: TextureId,
 }
-
 
 impl Building {
     // A factory function to abstract the common options and simplify new building creation.
@@ -137,7 +151,6 @@ impl Building {
     // The commands need to be passed in. We can't hold a reference to them for longer than a game tick
     // Returns the entity built.
     pub fn build(self, commands: &mut Commands, point: Vec3) -> Option<Entity> {
-        
         // The scene needs to be inserted as a child so it can be displaced
         let scene = SceneBundle {
             scene: self.scene_handle,
@@ -202,24 +215,6 @@ pub struct BuildingTemplates {
     pub templates: Vec<Building>,
 }
 
-// The actual registering has been split across multiple systems, so we define a plugin for all of them.
-pub struct BuildingTemplatesPlugin;
-
-impl Plugin for BuildingTemplatesPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(BuildingTemplates {
-            templates: Vec::new(),
-        })
-        .add_system_set(
-            SystemSet::on_enter(AppState::InGame)
-                .label(AppStage::RegisterResources)
-                .with_system(register_defensive)
-                .with_system(register_main_base)
-                .with_system(register_resources),
-        );
-    }
-}
-
 // The base range of a machine gun is defined here, which means all the other ranges can be defined relative to it
 const MACHINE_GUN_RANGE: f32 = 8.0;
 pub fn register_defensive(
@@ -278,7 +273,6 @@ pub fn register_defensive(
 }
 
 impl Building {
-
     // A factory function to abstract the common options and simplify new building creation.
     // You can still define a new building directly, we do so for the main base for example
     pub fn new_resource(
@@ -332,7 +326,7 @@ pub fn register_resources(
         "",
         ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 2_000),
         100,
-        ResourceSet::new(50, 0, 0),
+        ResourceSet::new(25, 0, 0),
         "monorail_trainCargo",
         1.,
         &ass,
@@ -344,7 +338,7 @@ pub fn register_resources(
         "",
         ResourceGenerator::new(super::resources::ResourceType::Ore, 1, 1_000),
         100,
-        ResourceSet::new(200, 50, 0),
+        ResourceSet::new(100, 50, 0),
         "monorail_trainCargo",
         1.5,
         &ass,
@@ -356,7 +350,7 @@ pub fn register_resources(
         "",
         ResourceGenerator::new(super::resources::ResourceType::Gas, 1, 5_000),
         100,
-        ResourceSet::new(200, 0, 0),
+        ResourceSet::new(100, 0, 0),
         "machine_wirelessCable",
         1.,
         &ass,

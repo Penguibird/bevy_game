@@ -9,6 +9,7 @@ use crate::{
     health::health::Health,
 };
 
+// Holds the currenlty selected building to be displayed
 #[derive(Resource, Clone, Copy, Debug)]
 pub struct BuildingInfo {
     selected_entity: Option<Entity>,
@@ -21,6 +22,7 @@ impl Default for BuildingInfo {
     }
 }
 
+// Handles selecting the building to be displayed in building info ui
 pub fn building_info(
     mut events: EventReader<WorldClickEvent>,
     grid: Res<Grid>,
@@ -42,6 +44,8 @@ pub fn building_info(
     }
 }
 
+// Shows the info about the selected building
+// Buildings can be selected by clicking on them when the UI is in panning mode
 pub fn building_info_ui(
     query: Query<(&Health, Option<&GunType>, &BuildingInfoComponent)>,
     mut ctx: ResMut<EguiContext>,

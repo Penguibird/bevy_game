@@ -113,11 +113,14 @@ fn main() {
         .run();
 }
 
+// Removes all the entities that aren't the camera.
+// This runs on game over and is used to clear the board.
+// All the entities get respawned again on game start
 pub fn cleanup(
-    aliens: Query<Entity, Without<Camera3d>>,
+    entities: Query<Entity, Without<Camera3d>>,
     mut commands: Commands
 ) {
-    for e in aliens.iter() {
+    for e in entities.iter() {
         if let Some(mut e) = commands.get_entity(e) {
             e.despawn();
         }
