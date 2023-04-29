@@ -11,7 +11,6 @@ use bevy::{
     render::primitives::Frustum,
     transform,
 };
-use bevy_mod_picking::PickingCameraBundle;
 use bevy_rapier3d::na::{clamp, Quaternion};
 
 use crate::{
@@ -243,7 +242,6 @@ pub fn spawn_camera(mut commands: Commands) {
     let transform =
         Transform::from_xyz(0., y, x+20.).with_rotation(Quat::from_axis_angle(Vec3::NEG_X, tilt));
     commands.spawn((
-        PickingCameraBundle::default(),
         Camera3dBundle {
             transform,
             projection: Projection::Perspective(PerspectiveProjection::default()),

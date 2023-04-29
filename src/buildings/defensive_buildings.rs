@@ -134,6 +134,7 @@ pub fn damage_dealing(
             Entity,
             &Transform,
             Option<&GunType>,
+            Option<&Health>,
         )>,
         Query<(&mut Health, &Transform, Entity)>,
     )>,
@@ -142,7 +143,7 @@ pub fn damage_dealing(
 ) {
     let mut damage_dealers = query_set.p0();
 
-    // Due to rust borrowing, we can't mutate the targets at the same time as the damage dealers, as these could overlap. 
+    // Due to rust borrowing, we can't mutate the targets at the same time as the damage dealers, as these could overlap.
     // (They shouldn't in the current game implementation, but this allows the system to be more generic)
     // We therefore store all the target info in this tuple, in the form:
     // (target, damage, killer, hitter_translation, hitter_range)
@@ -150,7 +151,15 @@ pub fn damage_dealing(
     let mut targets: Vec<(Entity, i32, Entity, Vec3, f32)> = Vec::new();
 
     // Figure out all the targets and necessary info
-    for (mut d, target_selecting, e, transform, gun_type) in damage_dealers.iter_mut() {
+    for (mut d, target_selecting, e, transform, gun_type, health) in damage_dealers.iter_mut() {
+        // If the entity has a health component - means it can be killed - means we need to check if its alive.
+        // Dead entities can still exist for a while - during their death animation
+        if let Some(h) = health {
+            if h.hp <= 0 {
+                continue;
+            }
+        };
+
         d.cooldown.tick(time.delta());
         if !d.cooldown.just_finished() {
             continue;
@@ -201,7 +210,6 @@ pub fn damage_dealing(
     }
 }
 
-
 // Handle dying, including death animation and sounds triggering
 // This handles resource buildings as well
 pub fn building_death(
@@ -230,20 +238,25 @@ pub fn building_death(
                 },
             )
             .with_completed_event(DESPAWN_EVENT_CODE);
-            commands.entity(e).insert(Animator::new(tween));
+            let e = commands.get_entity(e);
+            if let Some(mut e) = e {
+                e.insert(Animator::new(tween));
+            }
             // a.alive = false;
         }
     }
     ev.clear();
 }
-// The animation_complete event cannot be our own user-defined event, all we get is to pass a code through. 
+// The animation_complete event cannot be our own user-defined event, all we get is to pass a code through.
 const DESPAWN_EVENT_CODE: u64 = 13;
 
 // Despawn the building after the animation finishes
 pub fn despawn_event_handling(mut commands: Commands, mut ev: EventReader<TweenCompleted>) {
     for ev in ev.iter() {
         if ev.user_data == DESPAWN_EVENT_CODE {
-            commands.entity(ev.entity).despawn_recursive();
+            if let Some(e) = commands.get_entity(ev.entity) {
+                e.despawn_recursive();
+            }
         }
     }
 }

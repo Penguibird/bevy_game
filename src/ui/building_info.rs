@@ -1,12 +1,15 @@
 use bevy::{input::mouse::MouseButtonInput, prelude::*};
-use bevy_egui::{egui, EguiContext};
-use bevy_mod_picking::PickingEvent;
+use bevy_egui::{
+    egui::{self, Align2},
+    EguiContext,
+};
 
 use crate::{
     buildings::{building_bundles::BuildingInfoComponent, grid::Grid},
     cameras::get_world_point_from_screen::WorldClickEvent,
     effects::muzzleflash::GunType,
     health::health::Health,
+    menu::menu::make_window,
 };
 
 // Holds the currenlty selected building to be displayed
@@ -52,7 +55,7 @@ pub fn building_info_ui(
     building_info: ResMut<BuildingInfo>,
 ) {
     if let Some(e) = building_info.selected_entity {
-        let w = egui::Window::new("Building info").show(ctx.ctx_mut(), |ui| {
+        let w = make_window(Align2::LEFT_BOTTOM, None).show(ctx.ctx_mut(), |ui| {
             if let Ok((h, _, building_info)) = query.get(e) {
                 ui.label(building_info.name);
                 ui.image(building_info.image, (100., 100.));

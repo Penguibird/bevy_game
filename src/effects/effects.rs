@@ -1,10 +1,9 @@
 use bevy::prelude::*;
-use bevy_hanabi::HanabiPlugin;
 use bevy_tweening::TweeningPlugin;
 
 use crate::AppState;
 
-use super::{firework, muzzleflash::*};
+use super::{muzzleflash::*};
 pub struct ParticlePlugin;
 
 // Main plugin for all the animations/effects
@@ -14,8 +13,6 @@ impl Plugin for ParticlePlugin {
         app.add_startup_system(setup_muzzleflash)
             // The external plugins
             .add_plugin(TweeningPlugin)
-            // .add_startup_system(firework::firework)
-            .add_plugin(HanabiPlugin)
             .add_startup_system(setup_laserflash)
             .init_resource::<EffectsHandles>()
             // Run effects when in game

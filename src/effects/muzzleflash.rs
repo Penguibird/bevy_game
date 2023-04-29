@@ -232,12 +232,7 @@ pub fn handle_gun_muzzleflash(
                     ev.transform.rotation.mul_vec3(Vec3::new(-offset, 0., 0.));
 
                 spawn_laserflash_bundle(&mut commands, &res, transform_left, None);
-                spawn_laserflash_bundle(
-                    &mut commands,
-                    &res,
-                    transform_right,
-                    None,
-                );
+                spawn_laserflash_bundle(&mut commands, &res, transform_right, None);
             }
         };
     }
@@ -248,14 +243,13 @@ pub fn handle_gun_muzzleflash(
 // because they only last for a short time
 
 // Spawns the predefined lazerflash bundle
-// 
+//
 fn spawn_laserflash_bundle(
     commands: &mut Commands,
     res: &Res<EffectsHandles>,
     transform: Transform,
     delay: Option<Duration>,
 ) -> () {
-
     // To imitate the explosion of the effect, we scale it up
     let duration = Duration::from_millis(500);
     let scale = Tween::new(
@@ -381,7 +375,10 @@ fn spawn_muzzleflash_bundle(
 }
 
 // Used for testing and correctly positioning the gunfire effects. Makes the guns fire all the time
-pub fn _test_muzzleflash(query: Query<(&Transform, &GunType)>, mut ev_w: EventWriter<GunFireEvent>) {
+pub fn _test_muzzleflash(
+    query: Query<(&Transform, &GunType)>,
+    mut ev_w: EventWriter<GunFireEvent>,
+) {
     for (t, g) in query.iter() {
         ev_w.send(GunFireEvent {
             transform: *t,
@@ -399,7 +396,9 @@ pub fn remove_muzzleflash(
     for (e, mut t) in query.iter_mut() {
         t.timer.tick(time.delta());
         if t.timer.finished() {
-            commands.entity(e).despawn_recursive();
+            if let Some(e) = commands.get_entity(e) {
+                e.despawn_recursive();
+            }
         }
     }
 }

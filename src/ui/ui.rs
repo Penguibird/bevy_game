@@ -6,16 +6,22 @@ use bevy::{
     ui,
 };
 use bevy_egui::{
-    egui::{self, Id, LayerId},
+    egui::{
+        self,
+        style::{Margin, Spacing},
+        Align2, Id, LayerId, Style,
+    },
     EguiContext, EguiPlugin,
 };
 
 use crate::{
     buildings::{
         building_bundles::{Building, BuildingBundle, BuildingTemplates},
-        building_system::{self, building_system, hide_highlight_square}, resource_images::ResourceImages,
+        building_system::{self, building_system, hide_highlight_square},
+        resource_images::ResourceImages,
     },
     cameras::pan_camera::{get_primary_window_size, PanOrbitCamera},
+    menu::menu::make_window,
     AppState,
 };
 
@@ -29,7 +35,7 @@ pub struct UIState {
     pub mode: UIMode,
 }
 // This enum not only shows which tab has been selected but also which item
-// BuildingDefensive(None) means that the category has been clicked and should be expanded, 
+// BuildingDefensive(None) means that the category has been clicked and should be expanded,
 // but no building has been selected yet
 #[derive(Debug, PartialEq)]
 pub enum UIMode {
@@ -57,20 +63,6 @@ impl Plugin for UIPlugin {
             });
     }
 }
-const LIGHT_BLUE: Color = Color::rgba(0.0, 186.0 / 256.0, 248.0 / 256.0, 1.0);
-
-const DARK_BLUE: Color = Color::rgba(3.0 / 256.0, 33.0 / 256.0, 59.0 / 256.0, 1.0);
-
-fn lighten_color(color: Color, lighten: f32) -> Color {
-    let [h, s, mut l, a] = color.as_hsla_f32();
-    l *= lighten;
-    return Color::Hsla {
-        hue: h,
-        saturation: s,
-        lightness: l,
-        alpha: a,
-    };
-}
 
 // The main menu for building/demolishing/panning
 fn ui_system(
@@ -79,7 +71,22 @@ fn ui_system(
     resource_images: Res<ResourceImages>,
     templates: Res<BuildingTemplates>,
 ) {
-    egui::Window::new("Buildings").show(ctx.ctx_mut(), |ui| {
+    let style = ctx.ctx_mut().style().as_ref().clone();
+    ctx.ctx_mut().set_style(Style {
+        spacing: Spacing {
+            menu_margin: Margin::same(4.),
+            window_margin: Margin::same(4.),
+            item_spacing: egui::Vec2::splat(6.),
+            button_padding: egui::Vec2::new(8., 4.),
+            ..Default::default()
+        },
+
+        ..style
+    });
+
+    let mut building_details_to_show: Option<&Building> = None;
+
+    make_window(Align2::LEFT_TOP, None).show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             let b = ui.selectable_label(
                 if let UIMode::BuildingDefensive(_) = ui_state.mode {
@@ -116,18 +123,67 @@ fn ui_system(
                 ui_state.mode = UIMode::Panning;
             }
         });
-        if let UIMode::BuildingDefensive(_) = &ui_state.mode {
-            templates.templates.iter().for_each(|b| {
-                if !b.show_in_menu {
-                    return;
-                }
-                if let BuildingBundle::DEFENSIVE(bundle) = &b.bundle {
-                    ui.horizontal(|ui| {
-                        let but = ui.selectable_label(b == b, b.building_info.name.to_string());
-                        if but.clicked() {
-                            ui_state.mode = UIMode::BuildingDefensive(Some(b.clone()));
-                        };
-                        if but.hovered() {
+        ui.horizontal_top(|ui| {
+            ui.set_max_width(100.);
+            ui.vertical_centered_justified(|ui| {
+                if let UIMode::BuildingDefensive(ref mut selected_building) = &mut ui_state.mode {
+                    templates.templates.iter().for_each(|b| {
+                        let checked = Some(b) == selected_building.as_ref();
+                        if !b.show_in_menu {
+                            return;
+                        }
+                        if let BuildingBundle::DEFENSIVE(bundle) = &b.bundle {
+                            let but =
+                                ui.selectable_label(checked, b.building_info.name.to_string());
+                            if but.clicked() {
+                                *selected_building = Some(b.clone());
+                            };
+                            if but.hovered() {
+                                building_details_to_show = Some(b);
+                            };
+                        }
+                    });
+                };
+
+                if let UIMode::BuildingResources(ref mut selected_building) = &mut ui_state.mode {
+                    templates.templates.iter().for_each(|b| {
+                        let checked = Some(b) == selected_building.as_ref();
+                        if !b.show_in_menu {
+                            return;
+                        }
+                        if let BuildingBundle::GENERATOR(bundle) = &b.bundle {
+                            let but =
+                                ui.selectable_label(checked, b.building_info.name.to_string());
+                            if but.clicked() {
+                                *selected_building = Some(b.clone());
+                            };
+
+                            if but.hovered() {
+                                building_details_to_show = Some(b);
+                            };
+                        }
+                    });
+                };
+            });
+            ui.vertical(|ui| {
+                if let Some(b) = building_details_to_show {
+                    match &b.bundle {
+                        BuildingBundle::GENERATOR(bundle) => {
+                            ui.vertical(|ui| {
+                                ui.image(b.building_info.image, (100., 100.));
+                                ui.label(b.building_info.description);
+                                ui.label(format!(
+                                    "Generates {} of {} every {} s",
+                                    bundle.generator.amount,
+                                    bundle.generator.resource_type,
+                                    bundle.generator.timer.duration().as_millis() as f32 / 1000.,
+                                ));
+                                ui.label(format!("Health: {}", bundle.health.max_hp));
+                                ui.label("Cost: ");
+                                b.cost.display(ui, &resource_images, false);
+                            });
+                        }
+                        BuildingBundle::DEFENSIVE(bundle) => {
                             ui.vertical(|ui| {
                                 ui.image(b.building_info.image, (100., 100.));
                                 ui.label(b.building_info.description);
@@ -142,42 +198,11 @@ fn ui_system(
                                 ui.label("Cost: ");
                                 b.cost.display(ui, &resource_images, false);
                             });
-                        };
-                    });
+                        }
+                    }
                 }
-            });
-        };
-
-        if let UIMode::BuildingResources(_) = &ui_state.mode {
-            templates.templates.iter().for_each(|b| {
-                if !b.show_in_menu {
-                    return;
-                }
-                if let BuildingBundle::GENERATOR(bundle) = &b.bundle {
-                    ui.horizontal(|ui| {
-                        let but = ui.selectable_label(b == b, b.building_info.name.to_string());
-                        if but.clicked() {
-                            ui_state.mode = UIMode::BuildingResources(Some(b.clone()));
-                        };
-
-                        if but.hovered() {
-                            ui.vertical(|ui| {
-                                ui.image(b.building_info.image, (100., 100.));
-                                ui.label(b.building_info.description);
-                                ui.label(format!("Generates {} of {} every {} s",
-                                    bundle.generator.amount,
-                                    bundle.generator.resource_type,
-                                    bundle.generator.timer.duration().as_millis() as f32 / 1000.,
-                                ));
-                                ui.label(format!("Health: {}", bundle.health.max_hp));
-                                ui.label("Cost: ");
-                                b.cost.display(ui, &resource_images, false);
-                            });
-                        };
-                    });
-                }
-            });
-        };
+            })
+        });
     });
     // ctx.ctx_mut().
     // handle_ui_click(&mut res, &w);

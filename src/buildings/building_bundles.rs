@@ -5,7 +5,6 @@ use bevy_egui::{
     egui::{Context, TextureId},
     EguiContext,
 };
-use bevy_mod_picking::PickableBundle;
 use bevy_rapier3d::prelude::{Collider, CollisionGroups, Group, RigidBody};
 
 use crate::{
@@ -164,7 +163,6 @@ impl Building {
         let default_bundle = (
             self.cost,
             AudioType::Building,
-            PickableBundle::default(),
             self.building_info,
             RigidBody::Fixed,
             CollisionGroups::new(Group::GROUP_1, Group::ALL),
@@ -226,7 +224,7 @@ pub fn register_defensive(
         100,
         ResourceSet::new(100, 40, 3),
         30,
-        500,
+        2500,
         3. * MACHINE_GUN_RANGE,
         GunType::LaserGun,
         (0.5 * 1.15).into(),
@@ -241,7 +239,7 @@ pub fn register_defensive(
         100,
         ResourceSet::new(50, 0, 0),
         30,
-        100,
+        1000,
         MACHINE_GUN_RANGE,
         GunType::MachineGun,
         (0.5 * 1.15).into(),
@@ -257,7 +255,7 @@ pub fn register_defensive(
         100,
         ResourceSet::new(200, 10, 0),
         30,
-        100,
+        500,
         MACHINE_GUN_RANGE,
         GunType::MachineGunMk2,
         (0.5 * 1.15).into(),

@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
 use bevy_egui::{
-    egui::{self, Ui},
+    egui::{self, style::Margin, Align2, Color32, Layout, RichText, Style, Ui},
     EguiContext, EguiPlugin,
 };
 
 use bevy::prelude::*;
 
-use crate::AppState;
+use crate::{menu::menu::make_window, AppState};
 
 use super::resource_images::{self, register_resource_images, ResourceImages};
 
@@ -30,7 +30,6 @@ impl ResourceSet {
         }
     }
 
-
     pub fn add(&mut self, r: ResourceType, amount: Amount) {
         let x = self.vec.iter_mut().find(|x| x.0 == r);
         if let Some(x) = x {
@@ -46,22 +45,47 @@ impl ResourceSet {
     // Not to be confused with the Display implementation further down
     // Needs the Res<ResourceImages> passed in
     // Renders all the resources into the ui provided
-    // show_empty_fields controls whether we want to display resources with amount 0. 
+    // show_empty_fields controls whether we want to display resources with amount 0.
     // We want that for the global ore displays, but not for cost displays for example
     pub fn display(&self, ui: &mut Ui, images: &ResourceImages, show_empty_fields: bool) {
-        ui.horizontal(|ui| {
-            for (res, amount) in
-                self.vec
-                    .iter()
-                    .filter(|r| if show_empty_fields { true } else { r.1 > 0 })
-            {
-                ui.vertical(|ui| {
-                    ui.image(images.get_image(res), (30., 30.));
-                    ui.label(res.to_string());
-                    ui.label(amount.to_string());
-                });
-            }
-        });
+        let style = ui.style();
+        // ui.set_style(Style {
+        //     spacing: egui::style::Spacing {
+        //         menu_margin: Margin::same(8.),
+        //         window_margin: Margin::same(8.),
+        //         item_spacing: egui::Vec2::splat(8.),
+        //         ..Default::default()
+        //     },
+        //     ..style.as_ref().clone()
+        // });
+
+        ui.set_max_width(200.);
+        ui.horizontal(
+            |ui| {
+                for (res, amount) in
+                    self.vec
+                        .iter()
+                        .filter(|r| if show_empty_fields { true } else { r.1 > 0 })
+                {
+                    ui.set_width(80.);
+                    ui.vertical_centered(|ui| {
+                        println!("Printing");
+                        dbg!(res);
+                        ui.image(images.get_image(res), (30., 30.));
+                        ui.label(res.to_string());
+                        ui.label(
+                            RichText::new(amount.to_string())
+                                .font(egui::FontId {
+                                    size: 20.,
+                                    family: egui::FontFamily::Monospace,
+                                })
+                                .color(Color32::WHITE)
+                                .strong(),
+                        );
+                    });
+                }
+            },
+        );
     }
 
     // Used to get half of the cost of the machine that gets returned on demolishing a building
@@ -197,16 +221,19 @@ impl Display for ResourceType {
     }
 }
 
-
+// The bottom right resource state menu showing how much of what resources you have.
 pub fn resource_ui(
     resources: Res<ResourceState>,
     // mut query: Query<(&ResourceStatus, &mut Text)>,
     resource_images: Res<ResourceImages>,
     mut ctx: ResMut<EguiContext>,
 ) {
-    let w = egui::Window::new("Ore status").show(ctx.ctx_mut(), |ui| {
-        resources.resources.display(ui, &resource_images, true);
-    });
+    make_window(Align2::RIGHT_BOTTOM, None)
+        // A small width so that the window width doesnt get min clamped
+        .min_width(10.)
+        .show(ctx.ctx_mut(), |ui| {
+            resources.resources.display(ui, &resource_images, true);
+        });
 }
 
 // A resource generator building component

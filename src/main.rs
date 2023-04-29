@@ -21,6 +21,7 @@ use health::health::{death_timers, DeathEvent};
 use main_base::main_base::{handle_main_base_gameover, spawn_main_base};
 use map::map::generate_map;
 use menu::menu::MenuPlugin;
+use game_timer::game_timer::GameTimerPlugin;
 use ui::ui::UIPlugin;
 
 use crate::map::map::MAP_SIZE;
@@ -29,6 +30,7 @@ mod cameras;
 mod aliens;
 mod audio;
 mod buildings;
+mod game_timer;
 mod effects;
 mod health;
 mod main_base;
@@ -41,7 +43,9 @@ pub enum AppState {
     MainMenu,
     InGame,
     GameOver,
+    Victory,
     Paused,
+    Instructions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemLabel)]
@@ -86,6 +90,8 @@ fn main() {
         .add_plugin(ResourcePlugin)
         // Audio
         .add_plugin(MyAudioPlugin)
+        // GameTimer
+        .add_plugin(GameTimerPlugin)
         //
         // Health management
         .add_event::<DeathEvent>()

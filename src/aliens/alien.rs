@@ -11,6 +11,7 @@ use crate::{
         defensive_buildings::{AlienTarget, DamageDealing, TargetSelecting},
         grid::Grid,
     },
+    game_timer::game_timer::InGameTime,
     health::health::{DeathEvent, Health},
     AppStage, AppState,
 };
@@ -31,30 +32,22 @@ impl Default for AlienCount {
 pub struct AlienPlugin;
 impl Plugin for AlienPlugin {
     fn build(&self, app: &mut App) {
-        app
-        .init_resource::<AlienCount>()
-        .insert_resource(AlienModel(None))
-        .add_system_set(
-            SystemSet::on_enter(AppState::InGame)
-                .label(AppStage::RegisterResources)
-                .with_system(register_aliens),
-        )
-        .insert_resource(InGameTime {
-            timer: Stopwatch::new(),
-        })
-        .add_system_set(SystemSet::on_enter(AppState::InGame).with_system(start_in_game_time))
-        .add_system_set(SystemSet::on_update(AppState::InGame).with_system(update_in_game_time))
-        .add_system_set(SystemSet::on_pause(AppState::InGame).with_system(pause_in_game_time))
-        .add_system_set(SystemSet::on_resume(AppState::InGame).with_system(unpause_in_game_time))
-        .init_resource::<AlienSpawnAngle>()
-        .add_system_set(
-            SystemSet::on_update(AppState::InGame)
-                .with_system(alien_ai)
-                .with_system(spawn_aliens)
-                .with_system(alien_spawning_randomize_angle)
-                .with_system(alien_cleanup)
-                .with_system(alien_death),
-        );
+        app.init_resource::<AlienCount>()
+            .insert_resource(AlienModel(None))
+            .add_system_set(
+                SystemSet::on_enter(AppState::InGame)
+                    .label(AppStage::RegisterResources)
+                    .with_system(register_aliens),
+            )
+            .init_resource::<AlienSpawnAngle>()
+            .add_system_set(
+                SystemSet::on_update(AppState::InGame)
+                    .with_system(alien_ai)
+                    .with_system(spawn_aliens)
+                    .with_system(alien_spawning_randomize_angle)
+                    .with_system(alien_cleanup)
+                    .with_system(alien_death),
+            );
     }
 }
 
@@ -67,30 +60,6 @@ impl Default for Alien {
     fn default() -> Self {
         Alien { alive: true }
     }
-}
-
-// Bevy's in built time doesn't account for game starting/ending/pausing,
-// Therefore we have this stopwatch which only runs in-game.
-// We can still use the Res<Time> for the delta 
-#[derive(Resource, Clone, Debug)]
-pub struct InGameTime {
-    timer: Stopwatch,
-}
-pub fn start_in_game_time(mut time: ResMut<InGameTime>) {
-    time.timer.reset();
-    time.timer.unpause();
-}
-
-pub fn pause_in_game_time(mut time: ResMut<InGameTime>) {
-    time.timer.pause();
-}
-
-pub fn unpause_in_game_time(mut time: ResMut<InGameTime>) {
-    time.timer.unpause();
-}
-
-pub fn update_in_game_time(t: Res<Time>,mut time: ResMut<InGameTime>) {
-    time.timer.tick(t.delta());
 }
 
 #[derive(Resource, Clone)]
@@ -128,7 +97,10 @@ pub fn get_probability_to_spawn_an_alien(
 
         // Ramp up to full power going on to 10 minutes;
         let final_wave_i = 10_f32;
-        let res = sawtooth * (x / (final_wave_i * period));
+        let mut res = sawtooth * (x / (final_wave_i * period));
+
+        // Add the building modifier - at a 100 buildings double the number of aliens spawned.
+        res *= ((building_count as f32) / 100.) + 1.;
 
         return res;
     }
@@ -176,13 +148,13 @@ impl Default for AlienSpawnAngle {
 }
 
 // All the aliens should come from a similar spot, but so that they don't always come from the same one
-// we change the bearing from which they come every 20-40s 
+// we change the bearing from which they come every 20-40s
 pub fn alien_spawning_randomize_angle(mut res: ResMut<AlienSpawnAngle>, time: Res<Time>) {
     res.timer.tick(time.delta());
     if res.timer.finished() {
         let mut rng = rand::thread_rng();
-        let min_d = 20_f32;
-        let max_d = 40_f32;
+        let min_d = 10_f32;
+        let max_d = 30_f32;
         let dur = (rng.gen::<f32>() * (max_d - min_d)) + min_d;
         dbg!(dur);
         res.timer.reset();
@@ -190,8 +162,8 @@ pub fn alien_spawning_randomize_angle(mut res: ResMut<AlienSpawnAngle>, time: Re
             .set_duration(Duration::from_millis((dur * 1000.) as u64));
 
         // Deviation
-        let min_d = PI / 10.;
-        let max_d = PI / 5.;
+        let min_d = PI / 8.;
+        let max_d = PI / 4.;
         res.deviation = (rng.gen::<f32>() * (max_d - min_d) + min_d);
 
         res.angle = rng.gen::<f32>() * 2. * PI;
@@ -234,7 +206,7 @@ pub fn spawn_aliens(
             Alien::default(),
             RigidBody::Dynamic,
             AudioType::Alien,
-            Health::new(50),
+            Health::new(200),
             LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z,
             SpatialBundle {
                 transform: Transform::from_xyz(x, 0.5, z), //.with_scale(Vec3::new(2.0,2.0,2.0)),
@@ -250,7 +222,7 @@ pub fn spawn_aliens(
             },
             DamageDealing {
                 cooldown: Timer::from_seconds(0.5, TimerMode::Repeating),
-                damage: 2,
+                damage: 5,
             },
         ))
         .with_children(|c| {
@@ -327,7 +299,9 @@ pub fn alien_cleanup(
     for mut x in query.iter_mut() {
         x.0.dead_for_timer.tick(time.delta());
         if x.0.dead_for_timer.finished() {
-            commands.entity(x.1).despawn_recursive();
+            if let Some(e) = commands.get_entity(x.1) {
+                e.despawn_recursive();
+            }
         }
     }
 }
