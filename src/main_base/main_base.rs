@@ -3,7 +3,15 @@ use bevy_egui::EguiContext;
 use bevy_rapier3d::prelude::Collider;
 
 use crate::{
-    buildings::{building_bundles::{BuildingTemplates, Building, BuildingInfoComponent, GeneratorBuildingBundle, BuildingBundle}, grid::Grid, defensive_buildings::AlienTarget, resources::{ResourceGenerator, ResourceSet, ResourceType}},
+    buildings::{
+        building_bundles::{
+            Building, BuildingBundle, BuildingInfoComponent, BuildingTemplates,
+            GeneratorBuildingBundle,
+        },
+        defensive_buildings::AlienTarget,
+        grid::Grid,
+        resources::{ResourceGenerator, ResourceSet, ResourceType},
+    },
     health::health::Health,
     AppState,
 };
@@ -26,7 +34,7 @@ pub fn register_main_base(
             description: "",
         },
         bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
-            health: Health::new(1000),
+            health: Health::new(1000_000_000),
             alien_target: AlienTarget { priority: 8 },
             generator: ResourceGenerator::new(ResourceType::Ore, 1, 10_000),
             collider: Collider::cuboid(1.1 * 0.8, 2.0 * 0.8, 1.28),
@@ -41,7 +49,6 @@ pub fn register_main_base(
     };
 
     templates.templates.push(b);
-
 }
 
 pub fn spawn_main_base(
@@ -57,7 +64,16 @@ pub fn spawn_main_base(
         .clone()
         .build(&mut commands, Vec3::splat(0.))
         .unwrap();
-    grid.block_square_vec3(Vec3::splat(0.), e);
+
+    // Block 4 squares in the center as the base is larger than a single square
+    for x in -1..=0 {
+        for y in -1..=0 {
+            grid.block_square((x, y), e);
+        }
+    }
+
+    // Insert a marker component
+    // This is to find the main base next time
     commands.get_entity(e).unwrap().insert(MainBaseComponent);
 }
 

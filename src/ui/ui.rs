@@ -58,19 +58,19 @@ impl Plugin for UIPlugin {
                     .with_system(ui_system)
                     .with_system(building_info),
             )
+            .add_system_set(
+                SystemSet::on_enter(AppState::InGame).with_system(set_in_game_menu_styling),
+            )
             .insert_resource(UIState {
                 mode: UIMode::Panning,
             });
     }
 }
 
-// The main menu for building/demolishing/panning
-fn ui_system(
-    mut ui_state: ResMut<UIState>,
-    mut ctx: ResMut<EguiContext>,
-    resource_images: Res<ResourceImages>,
-    templates: Res<BuildingTemplates>,
-) {
+// A system to set the styling for the menus drawn in game
+// This runs on game start.
+// Style changes are expensive
+fn set_in_game_menu_styling(mut ctx: ResMut<EguiContext>) {
     let style = ctx.ctx_mut().style().as_ref().clone();
     ctx.ctx_mut().set_style(Style {
         spacing: Spacing {
@@ -83,7 +83,72 @@ fn ui_system(
 
         ..style
     });
+}
 
+// Aliases for the menu control keys
+pub mod keys {
+    use bevy::prelude::KeyCode;
+    use bevy_egui::egui::Key;
+
+    pub const START_GAME: KeyCode = KeyCode::Return;
+    pub const EXIT: KeyCode = KeyCode::Escape;
+    pub const INSTRUCTIONS: KeyCode = KeyCode::I;
+
+    pub const DEF_BUILDING: KeyCode = KeyCode::Q;
+    pub const RES_BUILDING: KeyCode = KeyCode::W;
+    pub const DEMOLISH: KeyCode = KeyCode::E;
+    pub const PAN: KeyCode = KeyCode::R;
+    pub const NUMPADS: [KeyCode; 10] = [
+        KeyCode::Numpad1,
+        KeyCode::Numpad2,
+        KeyCode::Numpad3,
+        KeyCode::Numpad4,
+        KeyCode::Numpad5,
+        KeyCode::Numpad6,
+        KeyCode::Numpad7,
+        KeyCode::Numpad8,
+        KeyCode::Numpad9,
+        KeyCode::Numpad0,
+    ];
+    pub const NUMERALS: [KeyCode; 10] = [
+        KeyCode::Key1,
+        KeyCode::Key2,
+        KeyCode::Key3,
+        KeyCode::Key4,
+        KeyCode::Key5,
+        KeyCode::Key6,
+        KeyCode::Key7,
+        KeyCode::Key8,
+        KeyCode::Key9,
+        KeyCode::Key0,
+    ];
+}
+
+// pub trait MyToString  {
+//     fn string(&self) -> &str;
+// }
+// impl MyToString for KeyCode {
+//     fn string(&self) -> &str {
+//         use KeyCode::*;
+//         match &self {
+//             Q => "Q",
+//             W => "W",
+//             E => "E",
+//             R => "R",
+//             _ => "_",
+//         }
+//     }
+// }
+
+// The main menu for building/demolishing/panning
+fn ui_system(
+    mut ui_state: ResMut<UIState>,
+    mut ctx: ResMut<EguiContext>,
+    resource_images: Res<ResourceImages>,
+    templates: Res<BuildingTemplates>,
+    // For keyboard navigation
+    keys: Res<Input<KeyCode>>,
+) {
     let mut building_details_to_show: Option<&Building> = None;
 
     make_window(Align2::LEFT_TOP, None).show(ctx.ctx_mut(), |ui| {
@@ -94,9 +159,9 @@ fn ui_system(
                 } else {
                     false
                 },
-                "Defensive buildings",
+                "(Q) Defensive buildings",
             );
-            if b.clicked() {
+            if b.clicked() || keys.pressed(keys::DEF_BUILDING) {
                 ui_state.mode = UIMode::BuildingDefensive(None);
             }
 
@@ -106,20 +171,20 @@ fn ui_system(
                 } else {
                     false
                 },
-                "Resource buildings",
+                "(W) Resource buildings",
             );
-            if b.clicked() {
+            if b.clicked() || keys.pressed(keys::RES_BUILDING) {
                 ui_state.mode = UIMode::BuildingResources(None);
             }
 
-            let b = ui.selectable_label(ui_state.mode == UIMode::Destroying, "Demolish");
-            if b.clicked() {
+            let b = ui.selectable_label(ui_state.mode == UIMode::Destroying, "(E) Demolish");
+            if b.clicked() || keys.pressed(keys::DEMOLISH) {
                 ui_state.mode = UIMode::Destroying;
             }
 
-            let a = ui.selectable_label(ui_state.mode == UIMode::Panning, "Pan");
+            let a = ui.selectable_label(ui_state.mode == UIMode::Panning, "(R) Pan");
 
-            if a.clicked() {
+            if a.clicked() || keys.pressed(keys::PAN) {
                 ui_state.mode = UIMode::Panning;
             }
         });
@@ -127,46 +192,77 @@ fn ui_system(
             ui.set_max_width(100.);
             ui.vertical_centered_justified(|ui| {
                 if let UIMode::BuildingDefensive(ref mut selected_building) = &mut ui_state.mode {
-                    templates.templates.iter().for_each(|b| {
-                        let checked = Some(b) == selected_building.as_ref();
-                        if !b.show_in_menu {
-                            return;
-                        }
-                        if let BuildingBundle::DEFENSIVE(bundle) = &b.bundle {
-                            let but =
-                                ui.selectable_label(checked, b.building_info.name.to_string());
-                            if but.clicked() {
+                    templates
+                        .templates
+                        .iter()
+                        .filter(|b| b.show_in_menu)
+                        .filter(|b| {
+                            if let BuildingBundle::DEFENSIVE(_) = &b.bundle {
+                                true
+                            } else {
+                                false
+                            }
+                        })
+                        .enumerate()
+                        .for_each(|(i, b)| {
+                            let checked = Some(b) == selected_building.as_ref();
+                            let but = ui.selectable_label(
+                                checked,
+                                format!("({}) {}", i + 1 , b.building_info.name.to_string()),
+                            );
+                            let pressed = keys.pressed(keys::NUMERALS[i])
+                                || keys.pressed(keys::NUMPADS[i]);
+                            if but.clicked() || pressed {
                                 *selected_building = Some(b.clone());
                             };
-                            if but.hovered() {
+                            if but.hovered() || pressed {
                                 building_details_to_show = Some(b);
                             };
-                        }
-                    });
+                        });
                 };
 
                 if let UIMode::BuildingResources(ref mut selected_building) = &mut ui_state.mode {
-                    templates.templates.iter().for_each(|b| {
-                        let checked = Some(b) == selected_building.as_ref();
-                        if !b.show_in_menu {
-                            return;
-                        }
-                        if let BuildingBundle::GENERATOR(bundle) = &b.bundle {
-                            let but =
-                                ui.selectable_label(checked, b.building_info.name.to_string());
-                            if but.clicked() {
+                    templates
+                        .templates
+                        .iter()
+                        .filter(|b| b.show_in_menu)
+                        .filter(|b| {
+                            if let BuildingBundle::GENERATOR(_) = &b.bundle {
+                                true
+                            } else {
+                                false
+                            }
+                        })
+                        .enumerate()
+                        .for_each(|(i, b)| {
+                            let checked = Some(b) == selected_building.as_ref();
+                            let but = ui.selectable_label(
+                                checked,
+                                format!("({}) {}", i + 1, b.building_info.name.to_string()),
+                            );
+
+                            let pressed = keys.pressed(keys::NUMERALS[i])
+                                || keys.pressed(keys::NUMPADS[i]);
+                            if but.clicked() || pressed {
                                 *selected_building = Some(b.clone());
                             };
 
-                            if but.hovered() {
+                            if but.hovered() || pressed {
                                 building_details_to_show = Some(b);
                             };
-                        }
-                    });
+                        });
                 };
             });
             ui.vertical(|ui| {
-                if let Some(b) = building_details_to_show {
+                // This is the building selected to construct
+                let mut selected_building: Option<&Building> = None;
+                if let UIMode::BuildingDefensive(Some(b)) | UIMode::BuildingResources(Some(b)) =
+                    &ui_state.mode
+                {
+                    selected_building = Some(b);
+                };
+
+                if let Some(b) = building_details_to_show.or(selected_building) {
                     match &b.bundle {
                         BuildingBundle::GENERATOR(bundle) => {
                             ui.vertical(|ui| {

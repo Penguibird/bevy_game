@@ -61,7 +61,7 @@ pub fn update_in_game_time(t: Res<Time>, mut time: ResMut<InGameTime>) {
 }
 
 // If the player survives this many minutes they win the game
-pub const WIN_MINUTES: u64 = 10;
+pub const WIN_MINUTES: u64 = 100;
 pub const WIN_TIME: Duration = Duration::from_secs(60 * WIN_MINUTES);
 
 pub fn win_condition(time: Res<InGameTime>, mut game_state: ResMut<State<AppState>>) {

@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use bevy::{prelude::*, utils::HashMap};
 
 // Each building takes up a square.
-pub const SQUARE_SIZE: f32 = 3.0;
+pub const SQUARE_SIZE: f32 = 2.0;
 
 // The game state - tracks which squares are blocked and by which entity.
 // Also contains static methods to calculate square centers etc.

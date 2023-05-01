@@ -1,11 +1,11 @@
-use bevy::{app::AppExit, prelude::*};
+use bevy::{app::AppExit, input::keyboard::KeyboardInput, prelude::*};
 use bevy_egui::{
     egui::{self, style::Spacing, Vec2},
     egui::{style::Margin, Rect, Style, *},
     EguiContext,
 };
 
-use crate::{game_timer::game_timer::WIN_MINUTES, AppState};
+use crate::{game_timer::game_timer::WIN_MINUTES, ui::ui::keys, AppState};
 
 // This is the main game menu that you see on the game start
 pub struct MenuPlugin;
@@ -18,7 +18,7 @@ impl Plugin for MenuPlugin {
             .add_system_set(SystemSet::on_update(AppState::GameOver).with_system(game_over))
             .add_system_set(SystemSet::on_update(AppState::Victory).with_system(victory_screen))
             .add_system_set(
-                SystemSet::on_update(AppState::Victory).with_system(instruction_screen),
+                SystemSet::on_update(AppState::Instructions).with_system(instruction_screen),
             );
     }
 }
@@ -32,7 +32,7 @@ impl Plugin for MenuPlugin {
 //     }
 // }
 
-const LIGHT_BLUE: Color32 = Color32::from_rgb(0, 186, 248);
+const LIGHT_BLUE: Color32 = Color32::from_rgb(0, 223, 255);
 const DARK_BLUE: Color32 = Color32::from_rgb(3, 33, 59);
 
 // This isnt proper lightening, but works well enough for these purposes
@@ -71,7 +71,7 @@ fn def_widget_visuals(factor: f32) -> style::WidgetVisuals {
 
 // Sets the default theme for all the ui elements
 pub fn set_styles(mut ctx: ResMut<EguiContext>) {
-let visuals = ctx.ctx_mut().style().visuals.clone();
+    let visuals = ctx.ctx_mut().style().visuals.clone();
 
     ctx.ctx_mut().set_visuals(Visuals {
         dark_mode: true,
@@ -166,6 +166,7 @@ fn main_menu(
     mut app_state: ResMut<State<AppState>>,
     mut ctx: ResMut<EguiContext>,
     mut exit: EventWriter<AppExit>,
+    keys: Res<Input<KeyCode>>,
 ) {
     // Currently doesnt work - shelved
     // Check if font exists
@@ -205,13 +206,18 @@ fn main_menu(
                         heading("Resource Rumble");
                     });
 
-                    let b = ui.button("Start Game");
-                    if b.clicked() {
+                    let b = ui.button("Start Game (Enter)");
+                    if b.clicked() || keys.pressed(keys::START_GAME) {
                         // This shouldnt throw an error as Im never changing app state anywhere else during menu
                         app_state.set(AppState::InGame).unwrap();
                     };
 
-                    exit_game_button(ui, &mut exit);
+                    let b = ui.button("Instructions (I)");
+                    if b.clicked() || keys.pressed(keys::INSTRUCTIONS) {
+                        app_state.set(AppState::Instructions).unwrap();
+                    }
+
+                    exit_game_button(ui, &mut exit, &keys);
                 },
             )
             // style.text_styles
@@ -223,6 +229,7 @@ fn game_over(
     mut app_state: ResMut<State<AppState>>,
     mut ctx: ResMut<EguiContext>,
     mut exit: EventWriter<AppExit>,
+    keys: Res<Input<KeyCode>>,
 ) {
     set_menu_spacing(&mut ctx);
 
@@ -232,7 +239,7 @@ fn game_over(
 
         main_menu_button(ui, app_state);
 
-        exit_game_button(ui, &mut exit);
+        exit_game_button(ui, &mut exit, &keys);
     });
 }
 
@@ -245,9 +252,9 @@ fn main_menu_button(ui: &mut Ui, mut app_state: ResMut<State<AppState>>) {
 }
 
 // The exit game button, since we render it in both the main menu and the game over menu
-fn exit_game_button(ui: &mut Ui, exit: &mut EventWriter<AppExit>) {
-    let b = ui.button("Exit game");
-    if b.clicked() {
+fn exit_game_button(ui: &mut Ui, exit: &mut EventWriter<AppExit>, keys: &Res<Input<KeyCode>>) {
+    let b = ui.button("Exit game (Esc)");
+    if b.clicked() || keys.pressed(keys::EXIT) {
         exit.send(AppExit)
     };
     // return b;
@@ -257,8 +264,9 @@ fn victory_screen(
     app_state: ResMut<State<AppState>>,
     mut ctx: ResMut<EguiContext>,
     mut exit: EventWriter<AppExit>,
-) {
 
+    keys: Res<Input<KeyCode>>,
+) {
     set_menu_spacing(&mut ctx);
     egui::Window::new("Victory!").show(ctx.ctx_mut(), |ui| {
         ui.label("Victory!");
@@ -267,31 +275,33 @@ fn victory_screen(
         ui.label("In the meantime, follow us for more updates.");
 
         main_menu_button(ui, app_state);
-        exit_game_button(ui, &mut exit)
+        exit_game_button(ui, &mut exit, &keys);
     });
 }
 pub fn instruction_screen(app_state: ResMut<State<AppState>>, mut ctx: ResMut<EguiContext>) {
-    egui::Window::new("Victory!").show(ctx.ctx_mut(), |ui| {
-        ui.label("Here's how to play the game:");
+    make_window(Align2::CENTER_CENTER, None)
+    .min_width(600.)
+    .show(ctx.ctx_mut(), |ui| {
+        ui.heading("Here's how to play the game:");
         ui.wrap_text();
 
         ui.label("You've found yourself crash landed on an alien planet. There's only a handful of survivors and hordes of aliens who don't seem friendly. Luckily the planet seems to be rich in resources! Use them to defend your base! Hopefully you won't have to struggle for too long, a nearby rescue ship has caught your distress signal and is coming to save you!");
 
-        ui.label("Lose/Win conditions");
+        ui.heading("Lose/Win conditions");
         ui.label("The hangar in the middle of the map is your main base. If it gets destroyed you lose. Don't let it fall!");
         ui.label(format!("To win the game you need to survive until the rescue ship arrive to extract you - {} minutes after the start of the game. You have a time in-game to keep track of remaining time until extraction", WIN_MINUTES));
 
-        ui.label("Controls:");
-        ui.label("The game should be played with a mouse. You can use a keyboard for the menu navigations. In case of assistive devices we recommend rebinding thouse to mouse movements and controlling the menu with arrows.");
+        ui.heading("Controls:");
+        ui.label("The game should be played with a mouse. You can use a keyboard for the menu navigations, by pressing Q/W/E/R and then a number for selecting the specific building.");
         ui.label("By default your cursor is in the Panning mode. This means you can move the camera around by dragging the map, zoom using the scrollbar and also click on a building to view its details in the corner.");
-        ui.label("Note: The map can also be moved using WASD");
+        ui.heading("Note: The map can also be moved using arrows");
         ui.label("To build a building you can click on either the Build Defensive or the Build Resource option in the main menu, depending on the category of your desired building. This will expand a list of all the possible buildings. By hovering on a building you can view its details, including its costs. To construct a building successfuly, you need to have enough resources. After selecting your building, click on an empty square on the map to build it.");
         ui.label("If you want to replace a building you can use the demolish option. Demolishing a building returns half its building costs into your inventory.");
 
-        ui.label("Resources:");
+        ui.heading("Resources:");
         ui.label("You start the game with a limited amount of resources. You'll notice that a little bit of ore trickles in slowly. This comes from your main base, which functions as a resource generator. To increase your resource generation, you will need to construct resource generating building, such as mines or gas collectors. These will increase the rate at which resources generate as long as they're constructed.");
 
-        ui.label("Enemies:");
+        ui.heading("Enemies:");
         ui.label("Pretty quickly aliens will start rushing towards your buildings and damaging them. They can destroy buildings quickly, especialyl in hordes. Make sure you always have enough defensive buildings such as machine guns and that you cover all sides of your base, as the aliens can come from anywhere. Different buildings have different stats, make sure you pay attention to those and build a good mix of the different building types");
 
         ui.label("Note: Any terrain in the game is purely decorative. You can build over it, aliens run through it and it gives no bonuses as of now");

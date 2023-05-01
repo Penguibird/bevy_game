@@ -69,8 +69,6 @@ impl ResourceSet {
                 {
                     ui.set_width(80.);
                     ui.vertical_centered(|ui| {
-                        println!("Printing");
-                        dbg!(res);
                         ui.image(images.get_image(res), (30., 30.));
                         ui.label(res.to_string());
                         ui.label(

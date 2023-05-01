@@ -237,8 +237,8 @@ pub fn spawn_aliens(
 // Makes the aliens target the nearest building
 // Todo consider AlienTarget.priority
 pub fn alien_ai(
-    mut aliens: Query<(&Transform, &mut Velocity, &Alien, &mut TargetSelecting)>,
-    targets: Query<(&Transform, &AlienTarget, Entity), Without<Alien>>,
+    mut aliens: Query<(&mut Transform, &mut Velocity, &Alien, &mut TargetSelecting)>,
+    targets: Query<(&Transform, &AlienTarget, Entity, &Health), Without<Alien>>,
     _time: Res<Time>,
 ) {
     for mut alien in aliens.iter_mut() {
@@ -247,20 +247,41 @@ pub fn alien_ai(
         }
 
         let alien_pos = alien.0.translation;
-        let target = targets
-            .iter()
-            .min_by(|(transform_a, _, _), (transform_b, _, _)| {
-                alien_pos
-                    .distance(transform_a.translation)
-                    .total_cmp(&alien_pos.distance(transform_b.translation))
-            });
-        if let Some((t, _, e)) = target {
-            // println!("Alien moving towards a target at {:?}", t.translation);
+
+        // If the target exists turn and run towards it
+        if let Some((t, _, _, h)) = alien.3.target.and_then(|e| targets.get(e).ok()) {
+            
+            // Reset the target if it's dead
+            // Entity can exist even if it's dead - just for the animation
+            if h.hp <= 0 {
+                alien.3.target = None;
+            }
+
+            // Turn towards target
+            alien.0.look_at(t.translation, Vec3::Y);
+
+            // Extract only the rotation around the Y axis
+            // Otherwise the alien will tilt slightly towards the ground
+            let rot = alien.0.rotation.to_euler(EulerRot::YXZ).0;
+            alien.0.rotation = Quat::from_axis_angle(Vec3::Y, rot);
+
+            // Set velocity towards target
             *alien.1 = Velocity {
                 linvel: (t.translation - alien.0.translation).normalize() * ALIEN_SPEED,
                 angvel: Vec3::ZERO,
             };
-            alien.3.target = Some(e);
+            
+        } else {
+            // Set target
+            // Find the closest entity with the AlienTarget component
+            let target = targets
+                .iter()
+                .min_by(|(transform_a, ..), (transform_b, ..)| {
+                    alien_pos
+                        .distance(transform_a.translation)
+                        .total_cmp(&alien_pos.distance(transform_b.translation))
+                });
+            alien.3.target = target.map(|(_, _, e, ..)| e);
         }
     }
 }
