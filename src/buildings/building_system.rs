@@ -10,7 +10,10 @@ use crate::{
         pan_camera::{get_primary_window_size, PanOrbitCamera},
     },
     health::health::DeathEvent,
-    ui::ui::{UIMode, UIState},
+    ui::{
+        error_info::ErrorEvent,
+        ui::{UIMode, UIState},
+    }, main_base::main_base::MainBaseComponent,
 };
 
 use super::{
@@ -62,8 +65,11 @@ pub fn building_system(
     // So that we know how many resources to refund for the destruction of the building
     resource_cost_query: Query<
         (&ResourceSet, Entity),
-        (Without<PanOrbitCamera>, Without<HighlightSquare>),
+        (Without<PanOrbitCamera>, Without<HighlightSquare>, Without<MainBaseComponent>),
     >,
+    // Query for the main base so that we can't destroy it
+    // We need to exclude the other components to prevent query overlap
+    main_base: Query<&MainBaseComponent, (Without<HighlightSquare>, Without<PanOrbitCamera>)>,
     ui_state: Res<UIState>,
     // Technically we could predefine both the mesh and the material for the square, but we don't recreate the square often enough for this to be a significant memory leak
     mut meshes: ResMut<Assets<Mesh>>,
@@ -72,6 +78,9 @@ pub fn building_system(
     mut grid: ResMut<Grid>,
     mut commands: Commands,
     mut death_events: EventWriter<DeathEvent>,
+
+    // Notify the player that they cannot build
+    mut error_events: EventWriter<ErrorEvent>,
 ) {
     let cam_query = query_set.p0();
     let (cam, transform, proj) = cam_query.single();
@@ -137,12 +146,23 @@ pub fn building_system(
                         if let Some(e) = e {
                             grid.block_square_vec3(point, e);
                         }
+                    } else {
+                        error_events.send(ErrorEvent::NotEnoughResources);
                     }
+                } else {
+                    error_events.send(ErrorEvent::SpaceOccupied);
                 }
             }
             UIMode::Destroying => {
                 let entity = grid.get_entity(point);
                 if let Some(entity) = entity {
+                    // If the main base query can find the entity this means the entity is the main base
+                    // We want to prevent deleting that
+                    if main_base.get(*entity).is_ok() {
+                        error_events.send(ErrorEvent::CantDestroyYourOwnBase);
+                        return;
+                    }
+
                     if let Ok((cost, ..)) = resource_cost_query.get(*entity) {
                         resources.resources.add_set(&cost.div(2));
                     }
@@ -150,6 +170,8 @@ pub fn building_system(
                         entity: *entity,
                         killer: None,
                     })
+                } else {
+                    error_events.send(ErrorEvent::NothingToDestroy)
                 }
             }
             _ => {

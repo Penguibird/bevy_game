@@ -34,7 +34,8 @@ pub fn register_main_base(
             description: "",
         },
         bundle: BuildingBundle::GENERATOR(GeneratorBuildingBundle {
-            health: Health::new(1000_000_000),
+            // health: Health::new(1000_000_000),
+            health: Health::new(1000),
             alien_target: AlienTarget { priority: 8 },
             generator: ResourceGenerator::new(ResourceType::Ore, 1, 10_000),
             collider: Collider::cuboid(1.1 * 0.8, 2.0 * 0.8, 1.28),

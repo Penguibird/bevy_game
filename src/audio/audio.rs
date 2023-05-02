@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_kira_audio::{prelude::*, Audio};
 
 use crate::{
+    aliens::alien::AlienSpawnEvent,
     health::health::{DeathEvent, Health},
     AppState,
 };
@@ -15,6 +16,7 @@ impl Plugin for MyAudioPlugin {
         app.init_resource::<AudioHandles>()
             .add_startup_system(register_sounds)
             .add_plugin(AudioPlugin)
+            .add_system(alien_spawn_sound)
             .add_system_set(SystemSet::on_update(AppState::InGame).with_system(explosion_on_death));
     }
 }
@@ -23,6 +25,7 @@ impl Plugin for MyAudioPlugin {
 pub struct AudioHandles {
     building_explosion: Option<Handle<AudioSource>>,
     alien_death: Option<Handle<AudioSource>>,
+    alien_spawn: Option<Handle<AudioSource>>,
 }
 
 impl Default for AudioHandles {
@@ -30,6 +33,7 @@ impl Default for AudioHandles {
         AudioHandles {
             building_explosion: None,
             alien_death: None,
+            alien_spawn: None,
         }
     }
 }
@@ -39,6 +43,7 @@ pub fn register_sounds(ass: Res<AssetServer>, mut audio_handles: ResMut<AudioHan
     *audio_handles = AudioHandles {
         building_explosion: ass.load("sounds/explosion.wav").into(),
         alien_death: ass.load("sounds/alien_death.wav").into(),
+        alien_spawn: ass.load("sounds/alien_spawn.wav").into(),
     }
 }
 
@@ -46,6 +51,31 @@ pub fn register_sounds(ass: Res<AssetServer>, mut audio_handles: ResMut<AudioHan
 pub enum AudioType {
     Building,
     Alien,
+}
+
+pub fn audio_distance_volume(
+    camera: &Query<&Transform, With<Camera>>,
+    position: Vec3,
+    max_dist: Option<f32>,
+) -> f32 {
+    // We get the camera pos to figure out how far the listener is from the sound source
+    let camera_pos = camera
+        .get_single()
+        .and_then(|q| Ok(q.translation))
+        .unwrap_or(Vec3::new(0., 15., 0.));
+
+    let distance = position.distance(camera_pos);
+
+    // Decrease faster than in the real world
+    let mut volume = 1. / (f32::log2(distance * 5.));
+
+    if let Some(max_dist) = max_dist {
+        if (distance > max_dist) {
+            return 0.;
+        };
+    }
+
+    return distance;
 }
 
 // Plays a spatially edited sound for any dying entity
@@ -62,12 +92,6 @@ pub fn explosion_on_death(
     camera: Query<&Transform, With<Camera>>,
     mut dying_entity: Query<(&Transform, Option<&AudioType>, &mut Health, Entity), Without<Camera>>,
 ) {
-    // We get the camera pos to figure out how far the listener is from the sound source
-    let camera_pos = camera
-        .get_single()
-        .and_then(|q| Ok(q.translation))
-        .unwrap_or(Vec3::new(0., 15., 0.));
-
     for ev in events.iter() {
         if let Ok((transform, sound, mut health, _)) = dying_entity.get_mut(ev.entity) {
             // Only play sound once
@@ -83,20 +107,16 @@ pub fn explosion_on_death(
             }
             let sound = sound.unwrap();
 
-            let distance = transform.translation.distance(camera_pos);
-
             // Dont play sounds if the camera is more than x units away from the source
             // We can get a different max_dist based on the soudn type.
-            let max_dist: f32 = match sound {
-                AudioType::Alien => 30.,
-                _ => 45.,
-            };
-            if (distance > max_dist) {
-                return;
-            };
-
-            // Decrease faster than in the real world
-            let mut volume = 1. / (f32::log2(distance * 5.));
+            let mut volume = audio_distance_volume(
+                &camera,
+                transform.translation,
+                Some(match sound {
+                    AudioType::Alien => 45.,
+                    _ => 45.,
+                }),
+            );
 
             // Decrease the total volume for this effect
             // volume modifiers based on the specific sound
@@ -117,5 +137,21 @@ pub fn explosion_on_death(
                 )
                 .with_volume(Volume::Amplitude(volume.into()));
         }
+    }
+}
+
+pub fn alien_spawn_sound(
+    mut ev: EventReader<AlienSpawnEvent>,
+    audio_handles: Res<AudioHandles>,
+
+    audio: Res<Audio>,
+    camera: Query<&Transform, With<Camera>>,
+) {
+    for e in ev.iter() {
+        let volume = audio_distance_volume(&camera, e.point, None);
+
+        audio
+            .play(audio_handles.alien_spawn.clone().unwrap())
+            .with_volume(Volume::Amplitude(volume.into()));
     }
 }

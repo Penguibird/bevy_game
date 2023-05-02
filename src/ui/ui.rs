@@ -25,7 +25,7 @@ use crate::{
     AppState,
 };
 
-use super::building_info::{building_info, building_info_ui, BuildingInfo};
+use super::{building_info::{building_info, building_info_ui, BuildingInfo}, error_info::ErrorMessagePlugin};
 
 /// This module defines all the ingame menus UI
 
@@ -58,6 +58,7 @@ impl Plugin for UIPlugin {
                     .with_system(ui_system)
                     .with_system(building_info),
             )
+            .add_plugin(ErrorMessagePlugin)
             .add_system_set(
                 SystemSet::on_enter(AppState::InGame).with_system(set_in_game_menu_styling),
             )

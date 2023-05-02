@@ -40,6 +40,7 @@ impl Plugin for AlienPlugin {
                     .with_system(register_aliens),
             )
             .init_resource::<AlienSpawnAngle>()
+            .add_event::<AlienSpawnEvent >()
             .add_system_set(
                 SystemSet::on_update(AppState::InGame)
                     .with_system(alien_ai)
@@ -170,6 +171,11 @@ pub fn alien_spawning_randomize_angle(mut res: ResMut<AlienSpawnAngle>, time: Re
     }
 }
 
+// Primarily exists for audio
+pub struct AlienSpawnEvent {
+    pub point: Vec3
+}
+
 pub fn spawn_aliens(
     angle: Res<AlienSpawnAngle>,
     mut commands: Commands,
@@ -177,6 +183,7 @@ pub fn spawn_aliens(
     grid: Res<Grid>,
     model: Res<AlienModel>,
     time: Res<InGameTime>,
+    mut ev_w: EventWriter<AlienSpawnEvent>
 ) {
     // let mesh: &Mesh =
     //     Assets::get(Assets, &ass.load("spacekit_2/Models/GLTF format/alien.glb#Scene0")).unwrap();
@@ -200,6 +207,7 @@ pub fn spawn_aliens(
     z += rng.gen::<f32>() * 2.;
 
     println!("Spawning an alien at {}, {}", x, z);
+    ev_w.send(AlienSpawnEvent { point: Vec3::new(x, 0.1, z) });
     count.count += 1;
     commands
         .spawn((

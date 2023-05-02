@@ -61,7 +61,9 @@ pub fn update_in_game_time(t: Res<Time>, mut time: ResMut<InGameTime>) {
 }
 
 // If the player survives this many minutes they win the game
-pub const WIN_MINUTES: u64 = 100;
+pub const WIN_MINUTES: u64 = 15;
+/// used in testing
+// pub const WIN_MINUTES: u64 = 100;
 pub const WIN_TIME: Duration = Duration::from_secs(60 * WIN_MINUTES);
 
 pub fn win_condition(time: Res<InGameTime>, mut game_state: ResMut<State<AppState>>) {
@@ -79,7 +81,7 @@ pub fn pad(string: String) -> String {
 }
 pub fn game_time_ui(time: Res<InGameTime>, mut ctx: ResMut<EguiContext>) {
     make_window(Align2::RIGHT_TOP, None).show(ctx.ctx_mut(), |ui| {
-            ui.set_width(80.);
+        ui.set_width(80.);
         ui.vertical_centered(|ui| {
             ui.wrap_text();
             ui.label("Time until extraction");
