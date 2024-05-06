@@ -115,10 +115,8 @@ pub fn render_errors(errors: Query<&ErrorMessage>, mut ctx: ResMut<EguiContext>)
                 for e in errors.iter() {
                     let m = ERROR_DURATION.as_millis() as f32;
                     let mut alpha = (m - e.despawn_timer.elapsed().as_millis() as f32) / m;
-                    dbg!(alpha);
                     alpha *= 255.;
                     let alpha = alpha as u8;
-                    dbg!(alpha);
                     ui.label(
                         RichText::new(e.event.to_string())
                             .strong()

@@ -93,6 +93,13 @@ pub fn defensive_buildings_targetting(
         if let Some(t) = gun_target.target {
             let target = aliens.get(t);
             if let Ok(target) = target {
+                
+                // If the target is dead, choose a new target
+                if target.0.hp <= 0 {
+                    gun_target.target = None;
+                    return;
+                }
+
                 let target = target.2.translation;
                 let me = gun_transform.translation;
                 let diff = target - me;

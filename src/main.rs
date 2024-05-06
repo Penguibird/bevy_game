@@ -1,7 +1,7 @@
 #![allow(unused_imports, unused_parens)]
 use std::f32::consts::PI;
 
-use aliens::alien::{AlienPlugin, Alien};
+use aliens::alien::{Alien, AlienPlugin};
 use audio::audio::MyAudioPlugin;
 use bevy::pbr::DirectionalLightShadowMap;
 use bevy::prelude::*;
@@ -17,11 +17,11 @@ use cameras::get_world_point_from_screen::{emit_world_click_events, WorldClickEv
 use cameras::pan_camera::{pan_orbit_camera, spawn_camera};
 use effects::effects::ParticlePlugin;
 
+use game_timer::game_timer::GameTimerPlugin;
 use health::health::{death_timers, DeathEvent};
 use main_base::main_base::{handle_main_base_gameover, spawn_main_base};
 use map::map::generate_map;
 use menu::menu::MenuPlugin;
-use game_timer::game_timer::GameTimerPlugin;
 use ui::ui::UIPlugin;
 
 use crate::map::map::MAP_SIZE;
@@ -30,8 +30,8 @@ mod cameras;
 mod aliens;
 mod audio;
 mod buildings;
-mod game_timer;
 mod effects;
+mod game_timer;
 mod health;
 mod main_base;
 mod map;
@@ -61,9 +61,19 @@ fn main() {
     //     .set(VERTEX_WRITABLE_STORAGE, true);
 
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            window: WindowDescriptor {
+                mode: WindowMode::BorderlessFullscreen,
+                ..Default::default()
+            },
+            ..Default::default()
+        }))
         .insert_resource(Msaa::default())
         .insert_resource(DirectionalLightShadowMap { size: 8_000 })
+        // .insert_resource(WindowDescriptor{
+        //     mode: WindowMode::BorderlessFullscreen,
+        //     ..Default::default()
+        // })
         .add_state(AppState::MainMenu)
         //
         // Physics
@@ -111,8 +121,7 @@ fn main() {
             SystemSet::on_enter(AppState::InGame)
                 .after(AppStage::RegisterResources)
                 .with_system(spawn_main_base)
-                .with_system(generate_map)
-                // .with_system(testing_buildings),
+                .with_system(generate_map), // .with_system(testing_buildings),
         )
         .add_system_set(SystemSet::on_enter(AppState::GameOver).with_system(cleanup))
         // .add_startup_system_to_stage(StartupStage::PostStartup, testing_buildings)
@@ -122,10 +131,7 @@ fn main() {
 // Removes all the entities that aren't the camera.
 // This runs on game over and is used to clear the board.
 // All the entities get respawned again on game start
-pub fn cleanup(
-    entities: Query<Entity, Without<Camera3d>>,
-    mut commands: Commands
-) {
+pub fn cleanup(entities: Query<Entity, Without<Camera3d>>, mut commands: Commands) {
     for e in entities.iter() {
         if let Some(mut e) = commands.get_entity(e) {
             e.despawn();

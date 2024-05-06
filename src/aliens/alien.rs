@@ -157,7 +157,6 @@ pub fn alien_spawning_randomize_angle(mut res: ResMut<AlienSpawnAngle>, time: Re
         let min_d = 10_f32;
         let max_d = 30_f32;
         let dur = (rng.gen::<f32>() * (max_d - min_d)) + min_d;
-        dbg!(dur);
         res.timer.reset();
         res.timer
             .set_duration(Duration::from_millis((dur * 1000.) as u64));
@@ -206,7 +205,7 @@ pub fn spawn_aliens(
     x += rng.gen::<f32>() * 2.;
     z += rng.gen::<f32>() * 2.;
 
-    println!("Spawning an alien at {}, {}", x, z);
+    // println!("Spawning an alien at {}, {}", x, z);
     ev_w.send(AlienSpawnEvent { point: Vec3::new(x, 0.1, z) });
     count.count += 1;
     commands
